@@ -1,6 +1,6 @@
 ### For mini - project 1
 class Model () :
-    def ˙˙init˙˙ ( self ):
+    def __init__ ( self ):
         ## instantiate model + optimizer + loss function + any other stuff you need
         pass
 
