@@ -26,9 +26,13 @@ class Model(nn.Module) :
                                 nn.LeakyReLU(0.1),
                                 nn.Conv2d(32, 32, kernel_size = 3, stride = 1),
                                 nn.LeakyReLU(0.1),
+                                nn.Conv2d(32, 32, kernel_size = 3, stride = 1),
+                                nn.LeakyReLU(0.1),
                                 nn.Conv2d(32, 8, kernel_size = 3, stride = 1),
                                 ## decoder
                                 nn.ConvTranspose2d(8, 32, kernel_size=3, stride=1),
+                                nn.LeakyReLU(0.1),
+                                nn.ConvTranspose2d(32, 32, kernel_size=3, stride=1),
                                 nn.LeakyReLU(0.1),
                                 nn.ConvTranspose2d(32, 32, kernel_size=3, stride=1),
                                 nn.LeakyReLU(0.1),
@@ -40,10 +44,10 @@ class Model(nn.Module) :
             )
         
         self.criterion = nn.MSELoss()
-        self.nb_epochs = 250
-        self.optimizer = torch.optim.Adam(self.autoencoder.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(self.autoencoder.parameters(), lr=1e-2)
         self.mini_batch_size = 100
         self.eta = 1e-1
+        
         
 
     def load_pretrained_model(self):
@@ -51,16 +55,11 @@ class Model(nn.Module) :
         
         self.load_state_dict(torch.load("bestmodel.pth"))
         self.eval()
-            
 
-
-
-        pass
-
-    def train(self, train_input, train_target):
+    def train(self, train_input, train_target, num_epochs):
         #: train_input : tensor of size (N, C, H, W) containing a noisy version of the images
         #: train_target : tensor of size (N, C, H, W) containing another noisy version of the same images, which only differs from the input by their noise.
-        for e in range(self.nb_epochs):
+        for e in range(num_epochs):
             acc_loss = 0
             for b in range(0, train_input.size(0), self.mini_batch_size):
                 output = self.autoencoder(train_input.narrow(0, b, self.mini_batch_size))
@@ -85,8 +84,13 @@ class Model(nn.Module) :
 
 print('hello')
 
-noisy_imgs_1 , noisy_imgs_2 = torch.load('train_data_.pkl')
-noisy_imgs, clean_imgs = torch.load('val_data.pkl')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+noisy_imgs_1 , noisy_imgs_2 = torch.load('data/train_data.pkl')
+noisy_imgs_1 = noisy_imgs_1[:1000].to(device)
+noisy_imgs_2 = noisy_imgs_2[:1000].to(device)
+noisy_imgs, clean_imgs = torch.load('data/val_data.pkl')
+noisy_imgs = noisy_imgs.to(device)
+clean_imgs = clean_imgs.to(device)
 print('Shape of noisy_imgs_1', noisy_imgs_1.shape)
 print('Shape of noisy_imgs_2', noisy_imgs_2.shape)
 print('Shape of noisy_imgs', noisy_imgs.shape)
@@ -97,13 +101,11 @@ noisy_imgs_2 = noisy_imgs_2 / 255
 noisy_imgs = noisy_imgs / 255
 clean_imgs = clean_imgs / 255
 
-""" for k in range(10):
-    model = Model()
-    model.train(noisy_imgs_1, noisy_imgs_2)
-    prediction = model.predict(noisy_imgs)
-    nb_test_errors = psnr(prediction, clean_imgs)
-    print('test error Net {:0.2f}% {:d}/{:d}'.format((100 * nb_test_errors) / test_input.size(0),
-                                                      nb_test_errors, test_input.size(0))) """
+model = Model().to(device)
+model.train(noisy_imgs_1, noisy_imgs_2, 10)
+prediction = model.predict(noisy_imgs)
+nb_test_errors = psnr(prediction, clean_imgs)
+print('test error Net', nb_test_errors)
 
 model = Model()
 
@@ -115,10 +117,4 @@ torch.save(model.state_dict, FILE)
 loaded.load_state_dict(torch.load(FILE))
 loaded.eval() """
 
-
-'''
-TO DO :
-- save and load_pretrained_model() for the best model 
-- optimize our model
-- test the predictions
-'''
+"batchnormes / skipconnections / upsample = transpose convolution"
