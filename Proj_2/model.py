@@ -26,7 +26,7 @@ class Con2d(Module) :
         return []
 
 
-class mse (object) :
+class MSE (object) :
     def forward (self, *input) :
         raise NotImplementedError
     def backward (self, *gradwrtoutput):
@@ -35,7 +35,7 @@ class mse (object) :
         return []
 
 
-class relu (object) :
+class ReLU (object) :
     def forward (self, *input) :
         raise NotImplementedError
     def backward (self, *gradwrtoutput):
