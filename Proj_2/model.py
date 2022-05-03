@@ -3,13 +3,46 @@ from torch.nn.functional import fold, unfold
 torch.set ̇grad ̇enabled(False)
 
 
-class Module (object) :
+class Module(object) :
     def forward (self, *input) :
         raise NotImplementedError
     def backward (self, *gradwrtoutput):
         raise NotImplementedError 
     def param (self) :
         return []
+
+
+class Con2d(Module) :
+    def __init__(self, data_input, weights, bias):
+        self.tensor = data_input
+        self.weights = weights
+        self.biases = bias
+        self.backward
+    def forward (self, *input) :
+        
+    def backward (self, *gradwrtoutput):
+        raise NotImplementedError 
+    def param (self) :
+        return []
+
+
+class mse (object) :
+    def forward (self, *input) :
+        raise NotImplementedError
+    def backward (self, *gradwrtoutput):
+        raise NotImplementedError 
+    def param (self) :
+        return []
+
+
+class relu (object) :
+    def forward (self, *input) :
+        raise NotImplementedError
+    def backward (self, *gradwrtoutput):
+        raise NotImplementedError 
+    def param (self) :
+        return []
+
 
 '''
 • Convolution layer.
