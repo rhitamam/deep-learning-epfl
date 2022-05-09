@@ -196,9 +196,9 @@ class Model(nn.Module) :
         ## This loads the parameters saved in bestmodel .pth into the model
         #self.device = torch.device("cuda")
         # Choose whatever GPU device number you want
-        self.model.load_state_dict(torch.load("bestmodel.pth"))#, map_location="cuda:0"))
-        self.model.to(self.device)
-        self.eval()
+        self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"))#, map_location="cuda:0")
+        #self.model.to(self.device)
+        #self.eval()
             
 
     def train(self, train_input, train_target, num_epochs):
@@ -226,7 +226,7 @@ class Model(nn.Module) :
 
 
 ######################################################################
-
+'''
 print('hello')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -252,7 +252,7 @@ model = Model()
 
 FILE = "bestmodel.pth"
 torch.save(model.state_dict(), FILE)
-
+'''
 
 """ loaded = Model()
 loaded.load_state_dict(torch.load(FILE))
