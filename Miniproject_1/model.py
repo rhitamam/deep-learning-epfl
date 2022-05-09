@@ -194,11 +194,12 @@ class Model(nn.Module) :
 
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model
-        #self.device = torch.device("cuda")
+        #self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Choose whatever GPU device number you want
-        self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"))#, map_location="cuda:0")
+        model = myModel()
+        model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"), self.device)#, map_location="cuda:0")
         #self.model.to(self.device)
-        #self.eval()
+        model.eval()
             
 
     def train(self, train_input, train_target, num_epochs):
