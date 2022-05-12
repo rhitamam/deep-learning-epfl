@@ -64,6 +64,20 @@ class Conv2d(Module):
         """
         return [(self.weights, self.w_grad), (self.bias, self.b_grad)]
 
+class NeerestUpSampling(Module) :
+    def __init__(self,scalefactor):
+        self.scalefactor = scalefactor
+        
+    
+    def forward(self, input):
+        first = torch.repeat_interleave(input, 2, dim=3)
+        final =  torch.repeat_interleave(first,2,dim=2)
+        return final
+
+    def backward(self, gradwrtoutput):
+         self.gradwrtoutput = gradwrtoutput
+         #raise NotImplementedError
+         
 class SGD(object) :
     def __init__(self, module, lr=0.1, momentum=0.9):
         self.module = module
