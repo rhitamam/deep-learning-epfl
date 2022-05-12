@@ -11,15 +11,17 @@ torch.manual_seed(0)
 
 def psnr(denoised , ground_truth):
     # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
+    denoised = denoised.float()/255
+    ground_truth = ground_truth.float()/255
     mse = torch.mean((denoised - ground_truth) ** 2)
     return -10 * torch.log10(mse + 10**-8)
+
 
 #=====================================================================================
 
 class myModel (nn.Module) :
     def __init__ (self):
         super(myModel, self).__init__()
-
         #define the convolution layer for the encoder
         #layer 1
         self.c0 = nn.Conv2d(3, 48, kernel_size = 3, stride = 1, padding="same")
@@ -37,6 +39,7 @@ class myModel (nn.Module) :
 
         #define the activation function
         self.lr = nn.LeakyReLU(0.1)
+        self.r : nn.ReLU()
 
         #define maxpooling for downsampling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -74,6 +77,7 @@ class myModel (nn.Module) :
         self.dec1b = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding="same")
 
         self.out = nn.Conv2d(32, 3, kernel_size=1)
+        self.linear = nn.Linear(3, 32)
 
     def forward(self, x):
 
@@ -174,7 +178,8 @@ class myModel (nn.Module) :
 
         y = self.out(y)
         y = self.bn5(y)
-        y =self.lr(y)
+        #y = self.linear(y)
+        y = self.r(y)
 
         return y
 
@@ -183,7 +188,6 @@ class Model(nn.Module) :
     def __init__ (self):
         ## instantiate model + optimizer + loss function + any other stuff you need
         super(Model, self).__init__()
-        
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = myModel().to(self.device)
         self.criterion = nn.MSELoss()
@@ -194,17 +198,17 @@ class Model(nn.Module) :
 
     def load_pretrained_model(self):
         ## This loads the parameters saved in bestmodel .pth into the model
-        #self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        # Choose whatever GPU device number you want
-        model = myModel()
-        model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"), self.device)#, map_location="cuda:0")
-        #self.model.to(self.device)
-        model.eval()
+        return self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"))
+        #self.model.eval()
             
 
     def train(self, train_input, train_target, num_epochs):
         #: train_input : tensor of size (N, C, H, W) containing a noisy version of the images
         #: train_target : tensor of size (N, C, H, W) containing another noisy version of the same images, which only differs from the input by their noise.
+        #: normalize the input data
+        train_input = train_input.float() / 255
+        train_target= train_target.float() / 255
+        
         for e in range(num_epochs):
             acc_loss = 0
             for b in range(0, train_input.size(0), self.mini_batch_size):
@@ -221,40 +225,36 @@ class Model(nn.Module) :
 
             print(e, acc_loss)
 
+        #: save the trained model
+        FILE = "bestmodel.pth"
+        torch.save(self.model.state_dict(), FILE)
+
     def predict(self, test_input):
         #: test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained or the loaded network .
-        return self.model(test_input)        
+        return self.model(test_input.float()/255)        
 
-
-######################################################################
+#####################################################################
 '''
-print('hello')
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1[:1000].to(device)
-noisy_imgs_2 = noisy_imgs_2[:1000].to(device)
+noisy_imgs_1 = noisy_imgs_1[:100].to(device)
+noisy_imgs_2 = noisy_imgs_2[:100].to(device)
 noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
 noisy_imgs = noisy_imgs.to(device)
 clean_imgs = clean_imgs.to(device)
 
-noisy_imgs_1 = noisy_imgs_1 / 255
-noisy_imgs_2 = noisy_imgs_2 / 255
-noisy_imgs = noisy_imgs / 255
-clean_imgs = clean_imgs / 255
+#noisy_imgs_1 = noisy_imgs_1.float() / 255
+#noisy_imgs_2 = noisy_imgs_2.float() / 255
+#noisy_imgs = noisy_imgs.float() / 255
+#clean_imgs = clean_imgs.float() / 255
 
 model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 100)
+model.train(noisy_imgs_1, noisy_imgs_2, 10)
 prediction = model.predict(noisy_imgs)
 nb_test_errors = psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
-
-model = Model()
-
-FILE = "bestmodel.pth"
-torch.save(model.state_dict(), FILE)
 '''
 
-""" loaded = Model()
+''' loaded = Model()
 loaded.load_state_dict(torch.load(FILE))
-loaded.eval() """
+loaded.eval()'''
