@@ -39,7 +39,7 @@ class myModel (nn.Module) :
 
         #define the activation function
         self.lr = nn.LeakyReLU(0.1)
-        self.r : nn.ReLU()
+        self.r = nn.ReLU()
 
         #define maxpooling for downsampling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
