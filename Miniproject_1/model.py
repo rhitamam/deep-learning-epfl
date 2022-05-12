@@ -200,7 +200,7 @@ class Model(nn.Module) :
         #self.model.eval()
             
 
-    def train(self, train_input, train_target, num_epochs):
+    def train(self, train_input, train_target, num_epochs, save_model = False):
         #: train_input : tensor of size (N, C, H, W) containing a noisy version of the images
         #: train_target : tensor of size (N, C, H, W) containing another noisy version of the same images, which only differs from the input by their noise.
         #: normalize the input data
@@ -223,9 +223,11 @@ class Model(nn.Module) :
 
             print(e, acc_loss)
 
-        #: save the trained model
-        FILE = "bestmodel.pth"
-        torch.save(self.model.state_dict(), FILE)
+        #: save the trained model if save_model = True
+        if save_model:
+            FILE = "bestmodel.pth"
+            print("save the model as " + FILE)
+            torch.save(self.model.state_dict(), FILE)
 
     def predict(self, test_input):
         #: test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained or the loaded network .
@@ -247,7 +249,7 @@ clean_imgs = clean_imgs.to(device)
 #clean_imgs = clean_imgs.float() / 255
 
 model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 10)
+model.train(noisy_imgs_1, noisy_imgs_2, 10, save_model=True)
 prediction = model.predict(noisy_imgs)
 nb_test_errors = psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
