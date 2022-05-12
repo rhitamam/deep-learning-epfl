@@ -39,7 +39,7 @@ class myModel (nn.Module) :
 
         #define the activation function
         self.lr = nn.LeakyReLU(0.1)
-        self.r : nn.ReLU()
+        self.r = nn.ReLU()
 
         #define maxpooling for downsampling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -77,7 +77,6 @@ class myModel (nn.Module) :
         self.dec1b = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding="same")
 
         self.out = nn.Conv2d(32, 3, kernel_size=1)
-        self.linear = nn.Linear(3, 32)
 
     def forward(self, x):
 
@@ -178,7 +177,6 @@ class myModel (nn.Module) :
 
         y = self.out(y)
         y = self.bn5(y)
-        #y = self.linear(y)
         y = self.r(y)
 
         return y
@@ -234,7 +232,7 @@ class Model(nn.Module) :
         return self.model(test_input.float()/255)        
 
 #####################################################################
-'''
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
 noisy_imgs_1 = noisy_imgs_1[:100].to(device)
@@ -253,7 +251,7 @@ model.train(noisy_imgs_1, noisy_imgs_2, 10)
 prediction = model.predict(noisy_imgs)
 nb_test_errors = psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
-'''
+
 
 ''' loaded = Model()
 loaded.load_state_dict(torch.load(FILE))
