@@ -12,7 +12,7 @@ torch.manual_seed(0)
 def psnr(denoised , ground_truth):
     # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
     denoised = denoised.float()
-    ground_truth = ground_truth.float()/255
+    ground_truth = ground_truth.float()
     mse = torch.mean((denoised - ground_truth) ** 2)
     return -10 * torch.log10(mse + 10**-8)
 
