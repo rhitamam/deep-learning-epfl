@@ -70,8 +70,8 @@ class NeerestUpSampling(Module) :
         
     
     def forward(self, input):
-        first = torch.repeat_interleave(input, 2, dim=3)
-        final =  torch.repeat_interleave(first,2,dim=2)
+        first = repeat_interleave(input, 2, dim=3)
+        final =  repeat_interleave(first,2,dim=2)
         return final
 
     def backward(self, gradwrtoutput):
