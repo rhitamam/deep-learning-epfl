@@ -11,12 +11,15 @@ def dMSE(v, t):
     return 2 * (v - t)
 
 def ReLU_func(x):
-    return max(0.0, x)
+    x_ = x.clone() # make an exact copy to allow safe manipulations of the image
+    x_[x_<=0]=0
+    return x_
 
 def dReLU(x):
-    x = max(0.0, x)
-    x[x>0] = 1
-    return x
+    x_ = x.clone()
+    x_[x_<=0] = 0
+    x_[x_>0] = 1
+    return x_
 
 def initialize(in_channels, out_channels, kernel_size):
     """
@@ -38,7 +41,9 @@ def initialize(in_channels, out_channels, kernel_size):
 
 
 def Sigmoid_func(x):
-    return 1 / (1 + math.exp(-x))
+    x_ = x.clone()
+    return 1 / (1 + 1/x_.exp())
     
 def dSigmoid(x):
-    return Simoid(x) * (1 - Simoid(x))
+    x_ = x.clone()
+    return Sigmoid_func(x_) * (1 - Sigmoid_func(x_))

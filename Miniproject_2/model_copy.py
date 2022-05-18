@@ -1,4 +1,4 @@
-from torch import empty , cat , arange, Tensor, manual_seed, 
+from torch import empty , cat , arange, Tensor, manual_seed
 from torch.nn.functional import fold, unfold
 from others.otherfile1 import *
 import random, math
@@ -51,9 +51,11 @@ class Conv2d(Module):
     def backward (self,  gradwrtoutput):
         'test wrt to grad of conv2d !!'
         self.b_grad = gradwrtoutput
-        
-        fold = fold(output_size=self.w_grad.shape, kernel_size=self.kernel_size)
-        self.w_grad = gradwrtoutput @ fold(self.input)
+        unfolded = unfold(input = self.input, kernel_size=self.kernel_size)
+        gwrto = gradwrtoutput.view(self.out_chan, -1)@unfolded
+        folded = fold(input = self.input, output_size=self.w_grad.shape, kernel_size=self.kernel_size)
+
+        self.w_grad = gradwrtoutput @ folded
         return (self.w_grad, self.b_grad)
 
     def param (self):
@@ -64,20 +66,6 @@ class Conv2d(Module):
         """
         return [(self.weights, self.w_grad), (self.bias, self.b_grad)]
 
-class NeerestUpSampling(Module) :
-    def __init__(self,scalefactor):
-        self.scalefactor = scalefactor
-        
-    
-    def forward(self, input):
-        first = torch.repeat_interleave(input, 2, dim=3)
-        final =  torch.repeat_interleave(first,2,dim=2)
-        return final
-
-    def backward(self, gradwrtoutput):
-         self.gradwrtoutput = gradwrtoutput
-         #raise NotImplementedError
-         
 class SGD(object) :
     def __init__(self, module, lr=0.1, momentum=0.9):
         self.module = module
@@ -116,6 +104,7 @@ class Sequential(Module) :
         'should return multiple params'
         param = [m.param() for m in self.modules]
         return param
+
 
 class MSE(Module) :
     def __init__(self):
@@ -162,27 +151,6 @@ class Sigmoid(Module) :
     def param (self) :
         return []
 
-'''
-Conv2d, TransposeConv2d or NearestUpsampling, ReLU, Sigmoid, MSE, SGD, Sequential.
-• Convolution layer.
-• Transpose convolution layer, or alternatively a combination of Nearest neighbor upsampling + Convolution.
-• Upsampling layer, which is usually implemented with transposed convolution, but you can alternatively use a combination of Nearest neighbor upsampling + Convolution for this mini-project.
-• ReLU
-• Sigmoid
-• A container like torch.nn.Sequential to put together an arbitrary configuration of modules together.
-• Mean Squared Error as a Loss Function
-• Stochastic Gradient Descent (SGD) optimizer
-'''
-
-'''
-report:
-- plot 
-- partie théorique
-- réutilisation de l'intro ?
-- rapport 2 individuels marquer la séparation ?
-'''
-
-'''
 #==============================================================================
 from charset_normalizer import from_path
 import torch
@@ -198,6 +166,26 @@ kernel_size = (2, 3)
 x = torch.randn((1, in_channels , 32, 32))
 y = torch.randn((1, out_channels , 31, 30))
 
+# With square kernels and equal stride
+m = Conv2d(in_channels, out_channels, kernel_size)
+ws,bs = m.param()
+w = ws[0]
+b = bs[0]
+output_2 = m.forward(x)
+
+# Output of PyTorch convolution
+expected = functional.conv2d(x, w, b)
+#expected = conv(x)
+
+# Output of convolution as a matrix product
+unfolded = torch.nn.functional.unfold(x, kernel_size=kernel_size)
+wxb = w.view(out_channels, -1) @ unfolded + b.view(1, -1, 1)
+actual = wxb.view(x.shape[0], out_channels, x.shape[2] - kernel_size[0] + 1, x.shape[3] - kernel_size[1]
++ 1)
+torch.testing.assert_allclose(actual , expected)
+
+torch.testing.assert_allclose(output_2 , expected)
+
 import torch.nn as nn
 
 model = nn.Sequential(
@@ -211,4 +199,9 @@ model = nn.Sequential(
 seq = Sequential([Conv2d(in_channels, out_channels, kernel_size), ReLU(), Sigmoid()])
 seq.forward(x,y)
 seq.backward()
+
+
+'''
+What does the forward of sequential return: the last output or the MSE?
+
 '''
