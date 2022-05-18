@@ -214,8 +214,9 @@ class Model(nn.Module) :
                 loss = self.criterion(output, train_target.narrow(0, b, self.mini_batch_size))
                 acc_loss = acc_loss + loss.item()
                 
-                self.model.zero_grad()
+                self.optimizer.zero_grad()
                 loss.backward()
+                self.optimizer.step()
                 
                 with torch.no_grad():
                     for p in self.model.parameters():
