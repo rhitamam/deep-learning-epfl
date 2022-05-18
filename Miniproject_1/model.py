@@ -191,7 +191,6 @@ class Model(nn.Module) :
         self.criterion = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         self.mini_batch_size = 100
-        self.eta = 1e-1
         
 
     def load_pretrained_model(self):
@@ -217,10 +216,6 @@ class Model(nn.Module) :
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                
-                with torch.no_grad():
-                    for p in self.model.parameters():
-                        p -= self.eta * p.grad
 
             print(e, acc_loss)
 
@@ -243,11 +238,6 @@ noisy_imgs_2 = noisy_imgs_2[:100].to(device)
 noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
 noisy_imgs = noisy_imgs.to(device)
 clean_imgs = clean_imgs.to(device)
-
-#noisy_imgs_1 = noisy_imgs_1.float() / 255
-#noisy_imgs_2 = noisy_imgs_2.float() / 255
-#noisy_imgs = noisy_imgs.float() / 255
-#clean_imgs = clean_imgs.float() / 255
 
 model = Model()
 model.train(noisy_imgs_1, noisy_imgs_2, 10, save_model=True)
