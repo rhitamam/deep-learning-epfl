@@ -49,11 +49,9 @@ class Conv2d(Module):
         return output
         
     def backward (self,  gradwrtoutput):
-        'test wrt to grad of conv2d !!'
-        self.b_grad = gradwrtoutput
-        
-        fold = fold(output_size=self.w_grad.shape, kernel_size=self.kernel_size)
-        self.w_grad = gradwrtoutput @ fold(self.input)
+        self.b_grad = gradwrtoutput.mean((0,2,3))
+        unfolded = unfold(self.input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
+        self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1)) 
         return (self.w_grad, self.b_grad)
 
     def param (self):
