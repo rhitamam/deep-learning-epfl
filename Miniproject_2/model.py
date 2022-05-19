@@ -34,18 +34,13 @@ class Conv2d(Module):
     def forward (self,  input) :
         #add padd stride and everything
         self.input = input
-        unfolded = unfold(input, kernel_size=self.kernel_size)
-        wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
-        output = wxb.view(input.shape[0], self.out_chan, input.shape[2] - self.kernel_size[0] + 1, input.shape[3] - self.kernel_size[1]+ 1)
-        '''
-        add 0 zeros to the input
-        add stride 
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
+        print(unfolded.shape)
+        wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
         output = wxb.view(input.shape[0], 
-                            self.out_chan,
-                            (1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]).floor_(),
-                            (1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[1]).floor_())
-        '''
+                    self.out_chan,
+                    math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
+                    math.floor(1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[0]))
         return output
         
     def backward (self,  gradwrtoutput):
@@ -62,7 +57,7 @@ class Conv2d(Module):
         """
         return [(self.weights, self.w_grad), (self.bias, self.b_grad)]
 
-class NeerestUpSampling(Module) :
+class NearestUpSampling(Module) :
     def __init__(self,scalefactor):
         self.scalefactor = scalefactor
         
