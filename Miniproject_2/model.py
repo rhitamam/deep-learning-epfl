@@ -1,10 +1,6 @@
-from copyreg import pickle
-from pickletools import optimize
-from telnetlib import SE
-from turtle import forward, update
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
-from others.otherfile1 import *
+from Miniproject_2.others.otherfile1 import *
 import random, math
 random.seed(0)
 manual_seed(0)
@@ -38,13 +34,18 @@ class Conv2d(Module):
     def forward (self,  input) :
         #add padd stride and everything
         self.input = input
-        unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
-        print(unfolded.shape)
+        unfolded = unfold(input, kernel_size=self.kernel_size)
         wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
+        output = wxb.view(input.shape[0], self.out_chan, input.shape[2] - self.kernel_size[0] + 1, input.shape[3] - self.kernel_size[1]+ 1)
+        '''
+        add 0 zeros to the input
+        add stride 
+        unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         output = wxb.view(input.shape[0], 
-                    self.out_chan,
-                    math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
-                    math.floor(1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[0]))
+                            self.out_chan,
+                            (1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]).floor_(),
+                            (1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[1]).floor_())
+        '''
         return output
         
     def backward (self,  gradwrtoutput):
@@ -171,12 +172,15 @@ class Model(Module):
         return self.model(test_input)
 
     def load_pretrained_model(self):
+        import pickle
         with open("Miniproject_2/bestmodel.pth") as f:
             loaded_dict = pickle.load(f)
+        i = 0
         for m in self.model.modules:
-            weight = loaded_dict[str(m)]["weights"]
-            bias = loaded_dict[str(m)]["bias"]
-            m.set_weights_and_bias(weight, bias)   
+            if isinstance(m, Conv2d):
+                weight = loaded_dict['c' + str(i)]["weights"]
+                bias = loaded_dict['c' + str(i)]["bias"]
+                m.set_weights_and_bias(weight, bias)   
         return self.model
 
     def save_model(self, FILE) :
@@ -185,12 +189,14 @@ class Model(Module):
         #make the dictionnary
         if isinstance(FILE, str):
             model_dict = {}
+            i = 0
             for m in self.model.modules:
                 if isinstance(m, Conv2d):
                     sub_dict= {}
                     sub_dict['weights'] = m.weights
                     sub_dict['bias'] = m.bias
-                    model_dict[str(m)] = sub_dict
+                    model_dict['c' + str(i)] = sub_dict
+                    i+=1
             
             with open(FILE, 'wb') as f:
                 pickle.dump(model_dict, f)
@@ -274,81 +280,65 @@ Conv2d, TransposeConv2d or NearestUpsampling, ReLU, Sigmoid, MSE, SGD, Sequentia
 • Stochastic Gradient Descent (SGD) optimizer
 '''
 
-'''
-report:
-- plot 
-- partie théorique
-- réutilisation de l'intro ?
-- rapport 2 individuels marquer la séparation ?
-'''
-
-
 #==============================================================================
+'''
 from charset_normalizer import from_path
 import torch
-from model import *
+from model_copy import *
 from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
 
-in_channels = 3 
+in_channels = 4 
 out_channels = 4
-kernel_size = (2, 3)
-
+kernel_size = 3
 x = torch.randn((1, in_channels , 32, 32))
-y = torch.randn((1, out_channels , 31, 30))
+y = torch.randn((1, out_channels , 30, 30))
 
 import torch.nn as nn
 
-'''
-model = nn.Sequential(
-          nn.Conv2d(in_channels, out_channels, kernel_size),
-          nn.ReLU(),
-          nn.Sigmoid()
-        )
-'''
 criterion = MSE()
 
 seq = Sequential(Conv2d(in_channels, out_channels, kernel_size), ReLU(), Sigmoid())
-'''seq = Sequential(Conv2d(in_channels= 3, out_channels= 4, kernel_size= kernel_size, stride= 1), ReLU(),
-                                Conv2d(in_channels= 4, out_channels= 4,kernel_size= kernel_size, stride= 1), ReLU(), 
-                                NearestUpsampling(2), 
-                                Conv2d(8, 8, kernel_size= kernel_size, stride= 2), ReLU(),
-                                NearestUpsampling(2),
-                                Sigmoid())'''
 
 optimizer= SGD(seq)
 output = seq.forward(x)
 loss = criterion.forward(output,y)
 optimizer.zero_grad()
 gradwrtout = criterion.backward()
-seq.backward()
+seq.backward(gradwrtout)
 
-'''
+
+
+
 #store each of the modules’ states in a pickle file
 import pickle
 
 FILE = 'bestmodel.pth'
 #make the dictionnary
-model_dict = {}
-for m in seq.modules:
-    if isinstance(m, Conv2d):
-        sub_dict= {}
-        sub_dict['weights'] = m.weights
-        sub_dict['bias'] = m.bias
-        #print(sub_dict)
-        model_dict[str(m)] = sub_dict
-        print(model_dict)
-        
-    with open(FILE, 'wb') as f:
-        pickle.dump(model_dict, f)
-'''
-'''
-with open("bestmodel.pth") as f:
-    loaded_dict = pickle.load(f)
+if isinstance(FILE, str):
+    model_dict = {}
+    i = 0
     for m in seq.modules:
         if isinstance(m, Conv2d):
-            weight = loaded_dict[str(m)]["weights"]
-            bias = loaded_dict[str(m)]["bias"]
-            m.set_weights_and_bias(weight, bias)   
+            sub_dict= {}
+            sub_dict['weights'] = m.weights
+            sub_dict['bias'] = m.bias
+            model_dict['c' + str(i)] = sub_dict
+            i+=1
+    print(model_dict)      
+    with open(FILE, 'wb') as f:
+        pickle.dump(model_dict, f)
+else:
+    raise RuntimeError('Error: FILE must be a string')
+
+
+with open("bestmodel.pth") as f:
+    loaded_dict = pickle.load(f)
+    i = 0
+    for m in seq.modules:
+        if isinstance(m, Conv2d):
+            weight = loaded_dict['c' + str(i)]["weights"]
+            bias = loaded_dict['c' + str(i)]["bias"]
+            m.set_weights_and_bias(weight, bias)
 '''
