@@ -1,6 +1,7 @@
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
-from Miniproject_2.others.otherfile1 import *
+#from Miniproject_2.others.otherfile1 import * To uncomment for the final submission
+from others.otherfile1 import *
 import random, math
 random.seed(0)
 manual_seed(0)
@@ -120,8 +121,8 @@ class Sequential(Module) :
 class Model(Module):
     def __init__(self) :
         #define the model
-        self.model = Sequential(Conv2d(in_channels= 3, out_channels= 4, stride= 1), ReLU(),
-                                Conv2d(in_channels= 4, out_channels= 4, stride= 1), ReLU(), 
+        self.model = Sequential(Conv2d(in_channels= 3, out_channels= 3, kernel_size=3, stride= 1), ReLU(),
+                                Conv2d(in_channels= 3, out_channels= 3, kernel_size=3, stride= 1), ReLU(), 
                                 NearestUpsampling(2), 
                                 Conv2d(8, 8, stride= 2), ReLU(),
                                 NearestUpsampling(2),
@@ -173,7 +174,7 @@ class Model(Module):
 
     def load_pretrained_model(self):
         import pickle
-        with open("Miniproject_2/bestmodel.pth") as f:
+        with open("Miniproject_2/bestmodel.pth", "rb") as f:
             loaded_dict = pickle.load(f)
         i = 0
         for m in self.model.modules:
@@ -284,7 +285,7 @@ Conv2d, TransposeConv2d or NearestUpsampling, ReLU, Sigmoid, MSE, SGD, Sequentia
 '''
 from charset_normalizer import from_path
 import torch
-from model_copy import *
+from model import *
 from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
@@ -294,6 +295,7 @@ out_channels = 4
 kernel_size = 3
 x = torch.randn((1, in_channels , 32, 32))
 y = torch.randn((1, out_channels , 30, 30))
+#y = torch.randn((1, out_channels , 26, 26))
 
 import torch.nn as nn
 
@@ -301,44 +303,18 @@ criterion = MSE()
 
 seq = Sequential(Conv2d(in_channels, out_channels, kernel_size), ReLU(), Sigmoid())
 
+'''
+
+'''seq= Sequential(Conv2d(in_channels= 4, out_channels= 4, kernel_size=3, stride= 1), ReLU(),
+                                Conv2d(in_channels= 4, out_channels= 4, kernel_size=3, stride= 1), ReLU(), 
+                                Conv2d(4, 4, kernel_size=3, stride= 2), ReLU(),
+                                Sigmoid())'''
+'''
 optimizer= SGD(seq)
+
 output = seq.forward(x)
 loss = criterion.forward(output,y)
 optimizer.zero_grad()
 gradwrtout = criterion.backward()
 seq.backward(gradwrtout)
-
-
-
-
-#store each of the modules’ states in a pickle file
-import pickle
-
-FILE = 'bestmodel.pth'
-#make the dictionnary
-if isinstance(FILE, str):
-    model_dict = {}
-    i = 0
-    for m in seq.modules:
-        if isinstance(m, Conv2d):
-            sub_dict= {}
-            sub_dict['weights'] = m.weights
-            sub_dict['bias'] = m.bias
-            model_dict['c' + str(i)] = sub_dict
-            i+=1
-    print(model_dict)      
-    with open(FILE, 'wb') as f:
-        pickle.dump(model_dict, f)
-else:
-    raise RuntimeError('Error: FILE must be a string')
-
-
-with open("bestmodel.pth") as f:
-    loaded_dict = pickle.load(f)
-    i = 0
-    for m in seq.modules:
-        if isinstance(m, Conv2d):
-            weight = loaded_dict['c' + str(i)]["weights"]
-            bias = loaded_dict['c' + str(i)]["bias"]
-            m.set_weights_and_bias(weight, bias)
 '''
