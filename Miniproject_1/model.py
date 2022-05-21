@@ -5,14 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-#from others.otherfile1 import *
 torch.manual_seed(0)
 
 
 def psnr(denoised , ground_truth):
     # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
     denoised = denoised.float()
-    ground_truth = ground_truth.float()
+    ground_truth = ground_truth.float()/255
     mse = torch.mean((denoised - ground_truth) ** 2)
     return -10 * torch.log10(mse + 10**-8)
 
@@ -230,21 +229,21 @@ class Model(nn.Module) :
         return self.model(test_input.float()/255)        
 
 #####################################################################
-
+'''
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1[:100].to(device)
-noisy_imgs_2 = noisy_imgs_2[:100].to(device)
+noisy_imgs_1 = noisy_imgs_1.to(device)
+noisy_imgs_2 = noisy_imgs_2.to(device)
 noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
 noisy_imgs = noisy_imgs.to(device)
 clean_imgs = clean_imgs.to(device)
 
 model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 10, save_model=True)
+model.train(noisy_imgs_1, noisy_imgs_2, 100, save_model=True)
 prediction = model.predict(noisy_imgs)
 nb_test_errors = psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
-
+'''
 
 ''' loaded = Model()
 loaded.load_state_dict(torch.load(FILE))
