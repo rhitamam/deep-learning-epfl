@@ -1,15 +1,10 @@
-from copyreg import pickle
-from pickletools import optimize
-from telnetlib import SE
-from turtle import forward, update
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
+#from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
 from others.otherfile1 import *
 import random, math
 random.seed(0)
 manual_seed(0)
-#torch.set_grad_enabled(False)
-
 
 class Module(object) :
     def forward (self,  input) :
