@@ -23,13 +23,10 @@ class Conv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
         self.in_chan = in_channels
         self.out_chan = out_channels
-        if (isinstance(kernel_size, int)):
-            self.kernel_size = (kernel_size, kernel_size)
-        else:
-            self.kernel_size = kernel_size
-        self.stride = stride
-        self.padding = padding
-        self.dilation = dilation
+        self.kernel_size = int_to_tuple(kernel_size)
+        self.stride = int_to_tuple(stride)
+        self.padding = int_to_tuple(padding)
+        self.dilation = int_to_tuple(dilation)
         self.weights, self.bias = initialize(in_channels, out_channels, self.kernel_size)
         self.w_grad = empty(self.weights.shape)
         self.b_grad = empty(self.bias.shape)
