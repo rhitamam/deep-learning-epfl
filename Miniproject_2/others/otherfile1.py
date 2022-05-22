@@ -47,3 +47,9 @@ def Sigmoid_func(x):
 def dSigmoid(x):
     x_ = x.clone()
     return Sigmoid_func(x_) * (1 - Sigmoid_func(x_))
+
+def int_to_tuple(param):
+        if (isinstance(param, int)):
+            return (param, param)
+        else:
+            return param 
