@@ -30,9 +30,12 @@ class Conv2d(Module):
     
     def forward (self,  input) :
         #add padd stride and everything
+        print("f conv2")
+        print("in")
         self.input = input
        
         unfolded = unfold(input, kernel_size=self.kernel_size)
+        print('yoho', self.weights.view(self.out_chan, -1).shape, unfolded.shape )
         wxb = self.weights.view(self.out_chan, -1) @ unfolded 
         if self.bias_bool:
             wxb += self.bias.view(1, -1, 1)
@@ -40,9 +43,6 @@ class Conv2d(Module):
                         self.out_chan, 
                         input.shape[2] - self.kernel_size[0] + 1, 
                         input.shape[3] - self.kernel_size[1]+ 1)
-        print('weightsii',self.weights.shape)
-        print('weightsii_grad',self.w_grad.shape)
-        print('bias',self.bias.shape)
         '''
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         print('unfolded',input.shape,unfolded.shape)
@@ -54,12 +54,16 @@ class Conv2d(Module):
                     math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
                     math.floor(1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[0]))
          '''
+        
+        print("out", output.shape)
         return output
         
     def backward(self, gradwrtoutput):
-        
+        print("b conv2")
+        print("in")
         unfolded = unfold(self.input, kernel_size=self.kernel_size)
-        self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
+        print(gradwrtoutput.view(self.out_chan, -1).shape,unfolded.squeeze(0).transpose(1,2).shape)
+        self.w_grad = (gradwrtoutput.view(self.out_chan, -1) @ unfolded.squeeze(0).transpose(1,2)).view(self.w_grad.size())
         '''
         self.b_grad = gradwrtoutput.mean((0,2,3))
         unfolded = unfold(self.input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
@@ -67,10 +71,11 @@ class Conv2d(Module):
         ''' 
         if self.bias_bool:
             self.b_grad = gradwrtoutput.mean((0,2,3))
-            print(self.w_grad.shape, self.b_grad.shape)
-            return (self.w_grad, self.b_grad)
-        else: 
-            return self.w_grad
+        dl_dx_old = self.weights.view(self.out_chan, -1).t() @ gradwrtoutput.view(1, self.out_chan, -1)
+        #dl_dx_old = dl_dx_old.view(self.input.shape)
+        dl_dx_old = fold(dl_dx_old, output_size=self.input.shape[2:], kernel_size=self.kernel_size)
+        print('out', dl_dx_old.shape)
+        return dl_dx_old 
 
     def param(self):
         """
@@ -170,18 +175,26 @@ class Sequential(Module) :
 class Model(Module):
     def __init__(self) :
         #define the model
-        self.model = Sequential(Conv2d(in_channels= 3, out_channels= 3, kernel_size=3, stride= 1), ReLU(),
-                                Conv2d(in_channels= 3, out_channels= 3, kernel_size=3, stride= 1), ReLU(), 
-                                NearestUpSampling(2), 
-                                Conv2d(8, 8,kernel_size=3, stride= 2), ReLU(),
-                                NearestUpSampling(2),
-                                Sigmoid())
+        in_channels = 3
+        out_channels = 3
+        self.model = Sequential(Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=10), 
+                ReLU(),
+                Conv2d(in_channels= out_channels, out_channels= out_channels, kernel_size=10), 
+                ReLU(), 
+                NearestUpSampling(2), 
+                Conv2d(out_channels, out_channels, kernel_size=5), 
+                Conv2d(out_channels, out_channels, kernel_size=5), 
+                ReLU(),
+                NearestUpSampling(2), 
+                Conv2d(out_channels, in_channels, kernel_size=5),
+                Conv2d(out_channels, out_channels, kernel_size=5), 
+                Sigmoid())
         self.mini_batch_size = 100
         self.criterion = MSE()
         #define the optimizer
         self.lr = 0.1
         self.momentum = 0.9
-        self.optimizer = SGD(self.model, lr= self.lr, momentum= self.momentum)
+        self.optimizer = SGD(self.model, lr=self.lr, momentum=self.momentum)
 
     def set_lr(self, lr):
         self.lr = lr
@@ -196,6 +209,7 @@ class Model(Module):
             for b in range(0, train_input.size(0), self.mini_batch_size):
                 input = train_input[b: b + self.mini_batch_size]
                 target = train_target[b: b+ self.mini_batch_size]
+                print('hoyo', input.shape)
                 #forward pass for the model sequential
                 output = self.model.forward(input)
                 #loss at the end of the forward pass
@@ -252,6 +266,14 @@ class Model(Module):
                 pickle.dump(model_dict, f)
         else:
             raise RuntimeError('Error: FILE must be a string')
+    
+    def psnr(denoised , ground_truth):
+        # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
+        denoised = denoised.float()
+        ground_truth = ground_truth.float()/255
+        mse = torch.mean((denoised - ground_truth) ** 2)
+        return -10 * torch.log10(mse + 10**-8)
+
        
 
 class MSE(Module) :
@@ -277,6 +299,7 @@ class ReLU(Module) :
 
     def forward (self,  input):
         self.tensor = input
+        print('relu', input.shape)
         return ReLU_func(input)
 
     def backward (self, gradwrtoutput):
@@ -293,7 +316,7 @@ class ReLU(Module) :
         return []
 
 
-class Sigmoid(Module) :
+class Sigmoid(Module):
     def __init__(self):
         self.tensor = Tensor()
 
@@ -349,33 +372,50 @@ import torch
 from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
-
+'''
 in_channels = 4 
 out_channels = 4
 kernel_size = 3
 x = torch.randn((1, in_channels , 32, 32))
+xtarg = torch.randn((1, in_channels , 32, 32))
+y = torch.randn((1, in_channels , 32, 32))
 
 import torch.nn as nn
 
 criterion = MSE()
 
-seq= Sequential(Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride= 2), 
+seq= Sequential(Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=10), 
                 ReLU(),
-                Conv2d(in_channels= out_channels, out_channels= out_channels, kernel_size=3, stride= 2), 
+                Conv2d(in_channels= out_channels, out_channels= out_channels, kernel_size=10), 
                 ReLU(), 
-                #NearestUpSampling(2), 
-                Conv2d(out_channels, out_channels, kernel_size=3, stride= 2), 
+                NearestUpSampling(2), 
+                Conv2d(out_channels, out_channels, kernel_size=5), 
+                Conv2d(out_channels, out_channels, kernel_size=5), 
                 ReLU(),
-                #NearestUpSampling(2), 
-                Conv2d(out_channels, out_channels, kernel_size=3, stride= 2),
+                NearestUpSampling(2), 
+                Conv2d(out_channels, in_channels, kernel_size=5),
+                Conv2d(out_channels, out_channels, kernel_size=5), 
                 Sigmoid())
 
 optimizer= SGD(seq)
 
 output = seq.forward(x)
-y = torch.randn(output.shape)
 loss = criterion.forward(output,y)
 optimizer.zero_grad()
 gradwrtout = criterion.backward()
 print('dldy', gradwrtout.shape, y.shape)
 seq.backward(gradwrtout)
+'''
+
+noisy_imgs_1 , noisy_imgs_2 = torch.load('data/train_data.pkl')
+noisy_imgs_1 = noisy_imgs_1[:50] / 255.0
+noisy_imgs_2 = noisy_imgs_2[:50]/ 255.0
+noisy_imgs, clean_imgs = torch.load('data/val_data.pkl')
+noisy_imgs = noisy_imgs[:50] / 255.0
+clean_imgs = clean_imgs[:50] / 255.0
+
+model = Model()
+model.train(noisy_imgs_1, noisy_imgs_2, 100, save_model=True)
+prediction = model.predict(noisy_imgs)
+nb_test_errors = model.psnr(prediction, clean_imgs)
+print('test error Net', nb_test_errors)
