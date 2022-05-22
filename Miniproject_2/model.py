@@ -22,6 +22,7 @@ class Conv2d(Module):
         self.stride = int_to_tuple(stride)
         self.padding = int_to_tuple(padding)
         self.dilation = int_to_tuple(dilation)
+        self.bias_bool = bias
         self.weights, self.bias = initialize(in_channels, out_channels, self.kernel_size, bias)
         self.w_grad = empty(self.weights.shape)
         self.b_grad = empty(self.bias.shape)
@@ -32,8 +33,16 @@ class Conv2d(Module):
         self.input = input
        
         unfolded = unfold(input, kernel_size=self.kernel_size)
-        wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
-        output = wxb.view(input.shape[0], self.out_chan, input.shape[2] - self.kernel_size[0] + 1, input.shape[3] - self.kernel_size[1]+ 1)
+        wxb = self.weights.view(self.out_chan, -1) @ unfolded 
+        if self.bias_bool:
+            wxb += self.bias.view(1, -1, 1)
+        output = wxb.view(input.shape[0], 
+                        self.out_chan, 
+                        input.shape[2] - self.kernel_size[0] + 1, 
+                        input.shape[3] - self.kernel_size[1]+ 1)
+        print('weightsii',self.weights.shape)
+        print('weightsii_grad',self.w_grad.shape)
+        print('bias',self.bias.shape)
         '''
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         print('unfolded',input.shape,unfolded.shape)
@@ -48,7 +57,7 @@ class Conv2d(Module):
         return output
         
     def backward(self, gradwrtoutput):
-        self.b_grad = gradwrtoutput.mean((0,2,3))
+        
         unfolded = unfold(self.input, kernel_size=self.kernel_size)
         self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
         '''
@@ -56,7 +65,12 @@ class Conv2d(Module):
         unfolded = unfold(self.input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
         ''' 
-        return (self.w_grad, self.b_grad)
+        if self.bias_bool:
+            self.b_grad = gradwrtoutput.mean((0,2,3))
+            print(self.w_grad.shape, self.b_grad.shape)
+            return (self.w_grad, self.b_grad)
+        else: 
+            return self.w_grad
 
     def param(self):
         """
@@ -64,22 +78,26 @@ class Conv2d(Module):
         Output: 
             * list of pairs composed of a parameter tensor and a gradient tensor
         """
-        return [(self.weights, self.w_grad), (self.bias, self.b_grad)]
+        if self.bias_bool:
+            return [(self.weights, self.w_grad), (self.bias, self.b_grad)]
+        else:
+            (self.weights, self.w_grad)
 
     def zero_grad(self):
         'set all the gradient of the weight and the bias to zero'
         self.w_grad = empty(self.weights.shape)
-        self.b_grad = empty(self.bias.shape)
+        if self.bias_bool:
+            self.b_grad = empty(self.bias.shape)
 
     def set_weights_and_bias(self, weights, bias):
         self.weights = weights
-        self.bias = bias
+        if self.bias_bool:
+            self.bias = bias
         
 
 class NearestUpSampling(Module) :
     def __init__(self,scalefactor):
         self.scalefactor = scalefactor
-        
     
     def forward(self, input):
         print("f near")
@@ -95,13 +113,23 @@ class NearestUpSampling(Module) :
     def backward(self, gradwrtoutput):
         print("b near")
         print("in")
-        print(gradwrtoutput.shape)
-        u = unfold(gradwrtoutput,kernel_size=self.scalefactor, stride=2)
-        print((gradwrtoutput.size()[2]/self.scalefactor)*(gradwrtoutput.size()[2]/self.scalefactor))
-        viewed = u.view(gradwrtoutput.shape[0],gradwrtoutput.size()[1],self.scalefactor*self.scalefactor,int((gradwrtoutput.size()[2]/self.scalefactor)*(gradwrtoutput.size()[2]/self.scalefactor)))
+        print(gradwrtoutput[0].shape)
+        if isinstance(gradwrtoutput,tuple):
+            weights, bias = gradwrtoutput
+        else:
+            weights = gradwrtoutput
+        u = unfold(weights,kernel_size=self.scalefactor, stride=2)
+        #print((weights.size()[2]/self.scalefactor)*(weights.size()[2]/self.scalefactor))
+        viewed = u.view(weights.shape[0],
+                        weights.size()[1],
+                        self.scalefactor*self.scalefactor,
+                        int((weights.size()[2]/self.scalefactor)*(weights.size()[2]/self.scalefactor)))
         to_mean = viewed.transpose(1,1).transpose(2,3)
         meaned = to_mean.mean(axis=3)
-        final = meaned.view(gradwrtoutput.size()[0],gradwrtoutput.size()[1],int(gradwrtoutput.size()[2]/2),int(gradwrtoutput.size()[2]/2))
+        final = meaned.view(weights.size()[0],
+                            weights.size()[1],
+                            int(weights.size()[2]/2),
+                            int(weights.size()[2]/2))
         print("out b")
         print(final.shape)
         return final
@@ -122,9 +150,9 @@ class Sequential(Module) :
         return out
     
     def backward (self, gradwrtoutput):
+        print(gradwrtoutput.shape)
         for module in reversed(self.modules):
             gradwrtoutput = module.backward(gradwrtoutput)
-            print(gradwrtoutput.size())
         return gradwrtoutput
     
     def param (self) :
@@ -253,10 +281,13 @@ class ReLU(Module) :
 
     def backward (self, gradwrtoutput):
         print("b relu")
-        for g in gradwrtoutput:
-            print(g.size())
-            g = g * dReLU(self.tensor)
-        return gradwrtoutput 
+        print(isinstance(gradwrtoutput,tuple))
+        print(self.tensor.shape)
+        if isinstance(gradwrtoutput,tuple):
+            print(gradwrtoutput[0].shape)
+            return (gradwrtoutput[0] * dReLU(self.tensor), gradwrtoutput[1] * dReLU(self.tensor))
+        else:
+            return gradwrtoutput * dReLU(self.tensor)
 
     def param (self) :
         return []
@@ -272,9 +303,11 @@ class Sigmoid(Module) :
 
     def backward (self, gradwrtoutput):
         print("b sigmoid")
-        for g in gradwrtoutput:
-            g = g * dSigmoid(self.tensor)
-        return gradwrtoutput 
+        #print(gradwrtout[0].shape, gradwrtout[1].shape)
+        if isinstance(gradwrtoutput,tuple):
+            return (gradwrtoutput[0] * dSigmoid(self.tensor), gradwrtoutput[1] * dSigmoid(self.tensor))
+        else:
+            return gradwrtoutput * dSigmoid(self.tensor)
 
     def param (self) :
         return []
@@ -321,22 +354,28 @@ in_channels = 4
 out_channels = 4
 kernel_size = 3
 x = torch.randn((1, in_channels , 32, 32))
-y = torch.randn((1, in_channels , 32, 32))
 
 import torch.nn as nn
 
 criterion = MSE()
 
-seq= Sequential(Conv2d(in_channels= 2, out_channels= 4, kernel_size=3, stride= 2), ReLU(),
-                                Conv2d(in_channels= 4, out_channels= 4, kernel_size=3, stride= 2), ReLU(), 
-                                NearestUpSampling(2), 
-                                Conv2d(4, 4, kernel_size=3, stride= 2), ReLU(),
-                                NearestUpSampling(2), Conv2d(4, 4, kernel_size=3, stride= 2),
-                                Sigmoid())
+seq= Sequential(Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride= 2), 
+                ReLU(),
+                Conv2d(in_channels= out_channels, out_channels= out_channels, kernel_size=3, stride= 2), 
+                ReLU(), 
+                #NearestUpSampling(2), 
+                Conv2d(out_channels, out_channels, kernel_size=3, stride= 2), 
+                ReLU(),
+                #NearestUpSampling(2), 
+                Conv2d(out_channels, out_channels, kernel_size=3, stride= 2),
+                Sigmoid())
+
 optimizer= SGD(seq)
 
 output = seq.forward(x)
+y = torch.randn(output.shape)
 loss = criterion.forward(output,y)
 optimizer.zero_grad()
 gradwrtout = criterion.backward()
+print('dldy', gradwrtout.shape, y.shape)
 seq.backward(gradwrtout)

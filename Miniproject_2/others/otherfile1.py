@@ -39,7 +39,8 @@ def initialize(in_channels, out_channels, kernel_size, bias):
        biases = empty(out_channels).uniform_(-k**0.5, k**0.5)
        return weights, biases
     else:
-        return weights
+        biases = None
+        return weights, biases
 
 
 def Sigmoid_func(x):
