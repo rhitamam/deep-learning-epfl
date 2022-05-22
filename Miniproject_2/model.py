@@ -20,14 +20,14 @@ class Module(object) :
         return []
 
 class Conv2d(Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
         self.in_chan = in_channels
         self.out_chan = out_channels
         self.kernel_size = int_to_tuple(kernel_size)
         self.stride = int_to_tuple(stride)
         self.padding = int_to_tuple(padding)
         self.dilation = int_to_tuple(dilation)
-        self.weights, self.bias = initialize(in_channels, out_channels, self.kernel_size)
+        self.weights, self.bias = initialize(in_channels, out_channels, self.kernel_size, bias)
         self.w_grad = empty(self.weights.shape)
         self.b_grad = empty(self.bias.shape)
         self.input = Tensor()
@@ -35,27 +35,35 @@ class Conv2d(Module):
     def forward (self,  input) :
         #add padd stride and everything
         self.input = input
+       
         unfolded = unfold(input, kernel_size=self.kernel_size)
         wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
         output = wxb.view(input.shape[0], self.out_chan, input.shape[2] - self.kernel_size[0] + 1, input.shape[3] - self.kernel_size[1]+ 1)
         '''
-        add 0 zeros to the input
-        add stride 
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
+        print('unfolded',input.shape,unfolded.shape)
+        print('weights', self.weights.shape, self.weights.view(self.out_chan, -1).shape)
+        print('biases', self.bias.view(1, -1, 1).shape)
+        wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
         output = wxb.view(input.shape[0], 
-                            self.out_chan,
-                            (1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]).floor_(),
-                            (1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[1]).floor_())
-        '''
+                    self.out_chan,
+                    math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
+                    math.floor(1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[0]))
+         '''
         return output
         
-    def backward (self,  gradwrtoutput):
+    def backward(self, gradwrtoutput):
+        self.b_grad = gradwrtoutput.mean((0,2,3))
+        unfolded = unfold(self.input, kernel_size=self.kernel_size)
+        self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
+        '''
         self.b_grad = gradwrtoutput.mean((0,2,3))
         unfolded = unfold(self.input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
-        self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1)) 
+        self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
+        ''' 
         return (self.w_grad, self.b_grad)
 
-    def param (self):
+    def param(self):
         """
         Return a list of pairs composed of a parameter tensor and a gradient tensor of the same size
         Output: 
@@ -79,25 +87,29 @@ class NearestUpSampling(Module) :
         
     
     def forward(self, input):
+        print("f near")
+        print("in")
+        print(input.shape)
         first = repeat_interleave(input, 2, dim=3)
         final =  repeat_interleave(first,2,dim=2)
-        print("Shape after the forward = \n" )
+        print("out")
         print(final.shape)
         
         return final
 
     def backward(self, gradwrtoutput):
+        print("b near")
+        print("in")
+        print(gradwrtoutput.shape)
         u = unfold(gradwrtoutput,kernel_size=self.scalefactor, stride=2)
         print((gradwrtoutput.size()[2]/self.scalefactor)*(gradwrtoutput.size()[2]/self.scalefactor))
         viewed = u.view(gradwrtoutput.shape[0],gradwrtoutput.size()[1],self.scalefactor*self.scalefactor,int((gradwrtoutput.size()[2]/self.scalefactor)*(gradwrtoutput.size()[2]/self.scalefactor)))
         to_mean = viewed.transpose(1,1).transpose(2,3)
         meaned = to_mean.mean(axis=3)
         final = meaned.view(gradwrtoutput.size()[0],gradwrtoutput.size()[1],int(gradwrtoutput.size()[2]/2),int(gradwrtoutput.size()[2]/2))
-        print("Shape after the backward =")
+        print("out b")
         print(final.shape)
         return final
-        #self.gradwrtoutput = gradwrtoutput
-         #raise NotImplementedError 
 
 
 class Sequential(Module) :
@@ -107,17 +119,17 @@ class Sequential(Module) :
 
     def forward (self, input) :
         out = input
-        
         for module in self.modules:
-            print("1")
             out = module.forward(out)
 
         self.input = out
+        #print(out.size())
         return out
     
     def backward (self, gradwrtoutput):
         for module in reversed(self.modules):
             gradwrtoutput = module.backward(gradwrtoutput)
+            print(gradwrtoutput.size())
         return gradwrtoutput
     
     def param (self) :
@@ -135,11 +147,11 @@ class Sequential(Module) :
 class Model(Module):
     def __init__(self) :
         #define the model
-        self.model = Sequential(Conv2d(in_channels= 3, out_channels= 4, stride= 1), ReLU(),
-                                Conv2d(in_channels= 4, out_channels= 4, stride= 1), ReLU(), 
-                                NearestUpsampling(2), 
-                                Conv2d(8, 8, stride= 2), ReLU(),
-                                NearestUpsampling(2),
+        self.model = Sequential(Conv2d(in_channels= 3, out_channels= 3, kernel_size=3, stride= 1), ReLU(),
+                                Conv2d(in_channels= 3, out_channels= 3, kernel_size=3, stride= 1), ReLU(), 
+                                NearestUpSampling(2), 
+                                Conv2d(8, 8,kernel_size=3, stride= 2), ReLU(),
+                                NearestUpSampling(2),
                                 Sigmoid())
         self.mini_batch_size = 100
         self.criterion = MSE()
@@ -187,12 +199,15 @@ class Model(Module):
         return self.model(test_input)
 
     def load_pretrained_model(self):
-        with open("Miniproject_2/bestmodel.pth") as f:
+        import pickle
+        with open("Miniproject_2/bestmodel.pth", "rb") as f:
             loaded_dict = pickle.load(f)
+        i = 0
         for m in self.model.modules:
-            weight = loaded_dict[str(m)]["weights"]
-            bias = loaded_dict[str(m)]["bias"]
-            m.set_weights_and_bias(weight, bias)   
+            if isinstance(m, Conv2d):
+                weight = loaded_dict['c' + str(i)]["weights"]
+                bias = loaded_dict['c' + str(i)]["bias"]
+                m.set_weights_and_bias(weight, bias)   
         return self.model
 
     def save_model(self, FILE) :
@@ -201,12 +216,14 @@ class Model(Module):
         #make the dictionnary
         if isinstance(FILE, str):
             model_dict = {}
+            i = 0
             for m in self.model.modules:
                 if isinstance(m, Conv2d):
                     sub_dict= {}
                     sub_dict['weights'] = m.weights
                     sub_dict['bias'] = m.bias
-                    model_dict[str(m)] = sub_dict
+                    model_dict['c' + str(i)] = sub_dict
+                    i+=1
             
             with open(FILE, 'wb') as f:
                 pickle.dump(model_dict, f)
@@ -240,7 +257,11 @@ class ReLU(Module) :
         return ReLU_func(input)
 
     def backward (self, gradwrtoutput):
-        return gradwrtoutput * dReLU(self.tensor)
+        print("b relu")
+        for g in gradwrtoutput:
+            print(g.size())
+            g = g * dReLU(self.tensor)
+        return gradwrtoutput 
 
     def param (self) :
         return []
@@ -255,10 +276,14 @@ class Sigmoid(Module) :
         return Sigmoid_func(input)
 
     def backward (self, gradwrtoutput):
-        return gradwrtoutput * dSigmoid(self.tensor)
+        print("b sigmoid")
+        for g in gradwrtoutput:
+            g = g * dSigmoid(self.tensor)
+        return gradwrtoutput 
 
     def param (self) :
         return []
+        
 
 class SGD(object) :
     def __init__(self, module, lr=0.1, momentum=0.9):
@@ -289,89 +314,34 @@ Conv2d, TransposeConv2d or NearestUpsampling, ReLU, Sigmoid, MSE, SGD, Sequentia
 • Stochastic Gradient Descent (SGD) optimizer
 '''
 
-'''
-report:
-- plot 
-- partie théorique
-- réutilisation de l'intro ?
-- rapport 2 individuels marquer la séparation ?
-'''
-
-
 #==============================================================================
+
 from charset_normalizer import from_path
 import torch
-from model import *
 from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
 
-in_channels = 4
+in_channels = 4 
 out_channels = 4
-kernel_size = (3, 3)
-
+kernel_size = 3
 x = torch.randn((1, in_channels , 32, 32))
-y = torch.randn((1, out_channels , 60, 60))
+y = torch.randn((1, in_channels , 32, 32))
 
 import torch.nn as nn
 
-'''
-model = nn.Sequential(
-          nn.Conv2d(in_channels, out_channels, kernel_size),
-          nn.ReLU(),
-          nn.Sigmoid()
-        )
-'''
 criterion = MSE()
 
-seq = Sequential(Conv2d(in_channels, out_channels, kernel_size), NearestUpSampling(scalefactor = 2), ReLU(), Sigmoid())
-'''seq = Sequential(Conv2d(in_channels= 3, out_channels= 4, kernel_size= kernel_size, stride= 1), ReLU(),
-                                Conv2d(in_channels= 4, out_channels= 4,kernel_size= kernel_size, stride= 1), ReLU(), 
-                                NearestUpsampling(2), 
-                                Conv2d(8, 8, kernel_size= kernel_size, stride= 2), ReLU(),
-                                NearestUpsampling(2),
-                                Sigmoid())'''
-
+seq= Sequential(Conv2d(in_channels= 2, out_channels= 4, kernel_size=3, stride= 2), ReLU(),
+                                Conv2d(in_channels= 4, out_channels= 4, kernel_size=3, stride= 2), ReLU(), 
+                                NearestUpSampling(2), 
+                                Conv2d(4, 4, kernel_size=3, stride= 2), ReLU(),
+                                NearestUpSampling(2), Conv2d(4, 4, kernel_size=3, stride= 2),
+                                Sigmoid())
 optimizer= SGD(seq)
+
 output = seq.forward(x)
 loss = criterion.forward(output,y)
 optimizer.zero_grad()
 gradwrtout = criterion.backward()
 seq.backward(gradwrtout)
-
-""" upsampl = NearestUpSampling(scalefactor=2)
-input = torch.arange(1, 5, dtype=torch.float32).view(1, 1, 2, 2)
-m = nn.Upsample(scale_factor=2, mode='nearest')
-fin = m(input)
-#print(fin)
-#print("\n")
-upsampl.forward(input)
- """
-'''
-#store each of the modules’ states in a pickle file
-import pickle
-
-FILE = 'bestmodel.pth'
-#make the dictionnary
-model_dict = {}
-for m in seq.modules:
-    if isinstance(m, Conv2d):
-        sub_dict= {}
-        sub_dict['weights'] = m.weights
-        sub_dict['bias'] = m.bias
-        #print(sub_dict)
-        model_dict[str(m)] = sub_dict
-        print(model_dict)
-        
-    with open(FILE, 'wb') as f:
-        pickle.dump(model_dict, f)
-'''
-'''
-with open("bestmodel.pth") as f:
-    loaded_dict = pickle.load(f)
-    for m in seq.modules:
-        if isinstance(m, Conv2d):
-            weight = loaded_dict[str(m)]["weights"]
-            bias = loaded_dict[str(m)]["bias"]
-            m.set_weights_and_bias(weight, bias)   
-'''

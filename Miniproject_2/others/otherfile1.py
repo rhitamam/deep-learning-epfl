@@ -21,7 +21,7 @@ def dReLU(x):
     x_[x_>0] = 1
     return x_
 
-def initialize(in_channels, out_channels, kernel_size):
+def initialize(in_channels, out_channels, kernel_size, bias):
     """
     Return weights and biases initialised such as the Conv2D Pytorch documentation 
     Input:
@@ -35,9 +35,11 @@ def initialize(in_channels, out_channels, kernel_size):
     k = 1 / (in_channels * kernel_size[0] * kernel_size[1])
 
     weights = empty((out_channels, in_channels, kernel_size[0], kernel_size[1])).uniform_(-k**0.5, k**0.5)
-    biases = empty(out_channels).uniform_(-k**0.5, k**0.5)
-
-    return weights, biases
+    if bias:
+       biases = empty(out_channels).uniform_(-k**0.5, k**0.5)
+       return weights, biases
+    else:
+        return weights
 
 
 def Sigmoid_func(x):
@@ -49,7 +51,16 @@ def dSigmoid(x):
     return Sigmoid_func(x_) * (1 - Sigmoid_func(x_))
 
 def int_to_tuple(param):
-        if (isinstance(param, int)):
-            return (param, param)
-        else:
-            return param 
+    """
+    Checks parameter's type and returns it as a tuple 
+    Input:
+        * param (int or tuple) - parameter of interest 
+    Output: 
+        * param (tuple) - paramater to return 
+    """
+    if (isinstance(param, int)):
+        return (param, param)
+    else:
+        assert isinstance(param, (list, tuple)), 'Parameter must be an int or a tuple like.'
+        assert len(param) == 2, 'Parameter must be of len at most 2.'
+        return param 
