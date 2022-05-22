@@ -60,9 +60,9 @@ class Conv2d(Module):
         
     def backward(self, gradwrtoutput):
         print("b conv2")
-        print("in")
+        print("in", gradwrtoutput.shape, self.weights.shape, self.input.shape)
         unfolded = unfold(self.input, kernel_size=self.kernel_size)
-        print(gradwrtoutput.view(self.out_chan, -1).shape,unfolded.squeeze(0).transpose(1,2).shape)
+        print(gradwrtoutput.view(self.out_chan, -1).shape,unfolded.shape)
         self.w_grad = (gradwrtoutput.view(self.out_chan, -1) @ unfolded.squeeze(0).transpose(1,2)).view(self.w_grad.size())
         '''
         self.b_grad = gradwrtoutput.mean((0,2,3))
@@ -304,13 +304,8 @@ class ReLU(Module) :
 
     def backward (self, gradwrtoutput):
         print("b relu")
-        print(isinstance(gradwrtoutput,tuple))
-        print(self.tensor.shape)
-        if isinstance(gradwrtoutput,tuple):
-            print(gradwrtoutput[0].shape)
-            return (gradwrtoutput[0] * dReLU(self.tensor), gradwrtoutput[1] * dReLU(self.tensor))
-        else:
-            return gradwrtoutput * dReLU(self.tensor)
+        print('out', (gradwrtoutput * dReLU(self.tensor)).shape)
+        return gradwrtoutput * dReLU(self.tensor)
 
     def param (self) :
         return []
@@ -326,11 +321,8 @@ class Sigmoid(Module):
 
     def backward (self, gradwrtoutput):
         print("b sigmoid")
-        #print(gradwrtout[0].shape, gradwrtout[1].shape)
-        if isinstance(gradwrtoutput,tuple):
-            return (gradwrtoutput[0] * dSigmoid(self.tensor), gradwrtoutput[1] * dSigmoid(self.tensor))
-        else:
-            return gradwrtoutput * dSigmoid(self.tensor)
+        print('out', (gradwrtoutput * dSigmoid(self.tensor)).shape)
+        return gradwrtoutput * dSigmoid(self.tensor)
 
     def param (self) :
         return []
