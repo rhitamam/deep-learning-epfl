@@ -9,6 +9,14 @@ torch.manual_seed(0)
 
 
 def psnr(denoised , ground_truth):
+    """
+    Computes the peak signal-to-noise ratio (PSNR) used to compare image compression quality.
+    Inputs:
+        * denoised (tensor) - denoised image
+        * ground_truth (tensor) - target clean image
+    Outputs: 
+        * (int) - the PSNR error between the input and the target
+    """
     # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
     denoised = denoised.float()
     ground_truth = ground_truth.float()/255
@@ -20,6 +28,9 @@ def psnr(denoised , ground_truth):
 
 class myModel (nn.Module) :
     def __init__ (self):
+        """
+        Class constructor, initializes object of type myModel with layers of Noise2Noise architecture.
+        """
         super(myModel, self).__init__()
         #define the convolution layer for the encoder
         #layer 1
@@ -78,7 +89,13 @@ class myModel (nn.Module) :
         self.out = nn.Conv2d(32, 3, kernel_size=1)
 
     def forward(self, x):
-
+        """
+        Calculate output of Noise2Noise model.
+        Inputs:
+            x (torch.tensor) - Input tensor of size (batch_size, input_dim)
+        Outputs:
+            y (torch.tensor) - Output tensor of size (batch_size, output_dim)
+        """
         #encoder part
         #layer 1
         y = self.c0(x)
@@ -183,7 +200,9 @@ class myModel (nn.Module) :
 #=====================================================================================
 class Model(nn.Module) :
     def __init__ (self):
-        ## instantiate model + optimizer + loss function + any other stuff you need
+        """
+        Class constructor, instantiates model, optimizer, loss function, batch-norm, criterion and device.
+        """
         super(Model, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = myModel().to(self.device)
@@ -193,14 +212,21 @@ class Model(nn.Module) :
         
 
     def load_pretrained_model(self):
-        ## This loads the parameters saved in bestmodel .pth into the model
+        """
+        Loads the parameters saved in bestmodel .pth into the model
+        """
         return self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"))
         #self.model.eval()
             
 
     def train(self, train_input, train_target, num_epochs, save_model = False):
-        #: train_input : tensor of size (N, C, H, W) containing a noisy version of the images
-        #: train_target : tensor of size (N, C, H, W) containing another noisy version of the same images, which only differs from the input by their noise.
+        """
+        Automated training of model using batch Adam.
+        Inputs:
+            * train_input (tensor of size (N, C, H, W)) -  a noisy version of the images
+            * train_target (tensor of size (N, C, H, W)) - another noisy version of the same images,
+                 which only differs from the input by their noise.
+        """
         #: normalize the input data
         train_input = train_input.float() / 255
         train_target= train_target.float() / 255
@@ -225,10 +251,18 @@ class Model(nn.Module) :
             torch.save(self.model.state_dict(), FILE)
 
     def predict(self, test_input):
-        #: test_input : tensor of size (N1 , C, H, W) that has to be denoised by the trained or the loaded network .
+        """
+        Prediction of denoised image using the Noise2Noise model.
+        Inputs:
+            * test_input (tensor of size (N1, C, H, W)) -  tensor that has to be denoised by 
+                the trained or the loaded network 
+        Outputs:
+            * (tensor of size (N1, C, H, W)) denoised version of the input
+        """
         return self.model(test_input.float()/255)        
 
 #####################################################################
+
 '''
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')

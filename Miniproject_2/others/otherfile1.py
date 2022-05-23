@@ -6,32 +6,32 @@ manual_seed(0)
 
 def MSE_func(v, t):
     """
-    Applies the mean squared error function
+    Applies the mean squared error function.
     Inputs:
         * v (tensor) - input of interest
         * t (tensor) - Number of channels produced by the convolution
-    Output: 
+    Outputs: 
         * (int) - the error between the input and the target
     """
     return (v - t).pow(2).sum()
 
 def dMSE(v, t):
     """
-    Applies the derivative of mean squared error function
+    Applies the derivative of mean squared error function.
     Inputs:
         * v (tensor) - input of interest
         * t (tensor) - Number of channels produced by the convolution
-    Output: 
+    Outputs: 
         * (tensor) - the gradient error between the input and the target
     """
     return 2 * (v - t)
 
 def ReLU_func(x):
     """
-    Applies the rectified linear unit function element-wise
-    Input:
+    Applies the rectified linear unit function element-wise.
+    Inputs:
         * x (tensor) - input of interest
-    Output: 
+    Outputs: 
         * x_ (tensor) - relu(x) 
     """
     x_ = x.clone() # make an exact copy to allow safe manipulations of the image
@@ -40,10 +40,10 @@ def ReLU_func(x):
 
 def dReLU(x):
     """
-    Applies the derivative of the rectified linear unit function element-wise
-    Input:
+    Applies the derivative of the rectified linear unit function element-wise.
+    Inputs:
         * x (tensor) - input of interest
-    Output: 
+    Outputs: 
         * x_ (tensor) - d_relu(x)
     """
     x_ = x.clone()
@@ -53,10 +53,10 @@ def dReLU(x):
 
 def Sigmoid_func(x):
     """
-    Applies the sigmoid function
-    Input:
+    Applies the sigmoid function.
+    Inputs:
         * x (tensor) - input of interest
-    Output: 
+    Outputs: 
         * x_ (tensor) - sigmoid(x)
     """
     x_ = x.clone()
@@ -64,10 +64,10 @@ def Sigmoid_func(x):
     
 def dSigmoid(x):
     """
-    Applies the derivative of the sigmoid function
-    Input:
+    Applies the derivative of the sigmoid function.
+    Inputs:
         * x (tensor) - input of interest
-    Output: 
+    Outputs: 
         * x_ (tensor) - d_sigmoid(x)
     """
     x_ = x.clone()
@@ -75,7 +75,7 @@ def dSigmoid(x):
 
 def initialize(in_channels, out_channels, kernel_size, bias):
     """
-    Return weights and biases initialised such as the Conv2D Pytorch documentation 
+    Return weights and biases initialised such as the Conv2D Pytorch documentation.
     Inputs:
         * in_channels (int) - Number of channels in the input image
         * out_channels (int) - Number of channels produced by the convolution
@@ -97,10 +97,10 @@ def initialize(in_channels, out_channels, kernel_size, bias):
 
 def int_to_tuple(param):
     """
-    Checks parameter's type and returns it as a tuple 
-    Input:
+    Checks parameter's type and returns it as a tuple.
+    Inputs:
         * param (int or tuple) - parameter of interest 
-    Output: 
+    Outputs: 
         * param (tuple) - paramater to return 
     """
     if (isinstance(param, int)):
