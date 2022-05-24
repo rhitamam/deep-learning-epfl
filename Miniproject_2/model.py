@@ -1,11 +1,10 @@
-from black import out
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
 #from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
 from others.otherfile1 import *
 import random, math
-from torch import autograd
-autograd.set_detect_anomaly(True)
+from torch import zeros
+
 random.seed(0)
 manual_seed(0)
 
@@ -37,6 +36,8 @@ class Conv2d(Module):
         self.input = input
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
+        if (torch.isnan(self.weights).any()):
+                    raise RuntimeError('Error: Nan weights')
         output = wxb.view(input.shape[0], 
                     self.out_chan,
                     math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
@@ -77,13 +78,18 @@ class Conv2d(Module):
         #print('w g', self.w_grad.shape)
         #print('b g', self.b_grad.shape)  
         #print("b conv out", dl_dx_old.shape)  
+        print(dl_dx_old)
+
         return dl_dx_old
     
 
     def backward(self, gradwrtoutput):
         dl_dx_old = []
         #print("b conv")
+        if (torch.isnan(gradwrtoutput).any()):
+            raise RuntimeError('Error: Nan gwto')
         for dl_ds in gradwrtoutput:
+            
             dl_dx_old_j = self.weights.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
             dl_dx_old_j = fold(dl_dx_old_j, output_size=self.input.shape[2:], kernel_size=self.kernel_size, dilation= self.dilation, padding= self.padding,stride=self.stride)
             dl_dx_old.append(dl_dx_old_j)
@@ -96,17 +102,16 @@ class Conv2d(Module):
                                     stride=self.stride)
                 #print("unfold", unfolded.shape)
                 if (torch.isnan(dl_ds).any()):
-                    print("nan")
-                    break
+                    raise RuntimeError('Error: Nan dl_ds')
+                
                 self.w_grad.add_((dl_ds.reshape(self.out_chan, unfolded.shape[2]) @ unfolded.squeeze(0).t()).view(self.w_grad.size()))
+                if (torch.isnan(self.w_grad).any()):
+                    raise RuntimeError('Error: Nan w grad add')
         
         if self.bias_bool:
             self.b_grad = gradwrtoutput.sum((0,2,3))
         
         dl_dx_old = torch.cat(dl_dx_old)
-        #print('w g', self.w_grad.shape)
-        #print('b g', self.b_grad.shape)
-        #print("b conv out", dl_dx_old.shape)
         return (dl_dx_old)
 
 
@@ -124,9 +129,9 @@ class Conv2d(Module):
 
     def zero_grad(self):
         'set all the gradient of the weight and the bias to zero'
-        self.w_grad = empty(self.weights.shape)
+        self.w_grad = zeros(self.weights.shape)
         if self.bias_bool:
-            self.b_grad = empty(self.bias.shape)
+            self.b_grad = zeros(self.bias.shape)
 
 
     def set_weights_and_bias(self, weights, bias):
@@ -213,6 +218,7 @@ class Model(Module):
                 NearestUpSampling(2), 
                 Conv2d(in_channels=32, out_channels= 3, kernel_size=(3,3), stride=(1,1), padding=(1,1)),
                 Sigmoid())
+
         self.mini_batch_size = 100
         self.criterion = MSE()
         #define the optimizer
@@ -238,13 +244,19 @@ class Model(Module):
         for epoch in range(num_epochs) :
             acc_loss = 0
             for b in range(0, train_input.size(0), self.mini_batch_size):
+                
                 input = train_input[b: b + self.mini_batch_size]
+                if (torch.isnan(input).any()):
+                    raise RuntimeError('Error: Nan inpout')
                 target = train_target[b: b+ self.mini_batch_size]
-                #forward pass for the model sequential
+
+                #forward pass for the model sequential  
                 output = self.model.forward(input)
+                print(output)
 
                 #loss at the end of the forward pass
                 loss = self.criterion.forward(output,target)
+
                 #print('loss', loss)
                 acc_loss += loss
 
@@ -306,6 +318,26 @@ class Model(Module):
         return -10 * torch.log10(mse + 10**-8)
        
 
+class SGD(object) :
+    def __init__(self, module, lr=0.1, momentum=0.9):
+        self.module = module
+        self.lr = lr
+        self.momentum = momentum
+
+    def step (self):
+        param = self.module.param()       
+        for p, m in zip(param, self.module.modules):
+            if isinstance(m, Conv2d):
+                weights = p[0][0] - (self.lr * p[0][1])
+                bias = p[1][0] - (self.lr * p[1][1])
+                m.set_weights_and_bias(weights, bias)
+    
+
+    def zero_grad(self) :
+        'set all the gradient of the weight and the bias to zero'
+        self.module.zero_grad()
+
+
 class MSE(Module) :
     def __init__(self):
         self.tensor = Tensor()
@@ -314,10 +346,12 @@ class MSE(Module) :
     def forward (self, input, target):
         self.tensor = input
         self.target = target
-        return MSE_func(input, target)
+        #print('mse', MSE_func(input, target))
+        return MSE_func(input, target)/ self.tensor.shape[0]
 
     def backward (self):
-        return dMSE(self.tensor, self.target) 
+        #print("dmse", (dMSE(self.tensor, self.target))/ self.tensor.shape[0])
+        return dMSE(self.tensor, self.target)/ self.tensor.shape[0]
 
     def param (self) :
         return []
@@ -353,57 +387,24 @@ class Sigmoid(Module):
         return []
         
 
-class SGD(object) :
-    def __init__(self, module, lr=0.1, momentum=0.9):
-        self.module = module
-        self.lr = lr
-        self.momentum = momentum
-
-    def step (self):
-        param = self.module.param()
-            
-        for p, m in zip(param, self.module.modules ):
-            if isinstance(m, Conv2d):
-                #update weight
-                #print("old w", m.weights)
-                #print("p0", p[0])
-                #print("p00", p[0][0])
-                #print("p01", p[0][1])
-                weights = p[0][0] - (self.lr * p[0][1])
-                #print("new w", weights)
-                #update bias
-                #print("old b", m.bias)
-                #print("p1", p[1])
-                #print("p10", p[1][0])
-                #print("p11", p[1][1])
-                bias = p[1][0] - (self.lr * p[1][1])
-                #print("new b", bias)
-                m.set_weights_and_bias(weights, bias)
-                #print("set param", m.param())
-    
-
-    def zero_grad(self) :
-        'set all the gradient of the weight and the bias to zero'
-        self.module.zero_grad()
-
 #==============================================================================
 
-from charset_normalizer import from_path
 import torch
 from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1[:50].float()
-noisy_imgs_2 = noisy_imgs_2[:50].float()
+noisy_imgs_1 = noisy_imgs_1[:10].float()
+noisy_imgs_2 = noisy_imgs_2[:10].float()
 noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
-noisy_imgs = noisy_imgs[:50].float()
-clean_imgs = clean_imgs[:50].float() / 255.0
+noisy_imgs = noisy_imgs[:10].float()
+clean_imgs = clean_imgs[:10].float() / 255.0
 
 model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 3, save_model=True)
+model.train(noisy_imgs_1, noisy_imgs_2, 4)
 prediction = model.predict(noisy_imgs)
 prediction = prediction / 255.0
 nb_test_errors = model.psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
+

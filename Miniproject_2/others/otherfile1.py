@@ -5,10 +5,10 @@ random.seed(0)
 manual_seed(0)
 
 def MSE_func(v, t):
-    return (v - t).pow(2).mean()
+    return ((v - t).pow(2)).sum().mean()
 
 def dMSE(v, t):
-    return 2 * (v - t).mean()
+    return (2 * (v - t))
 
 def ReLU_func(x):
     x_ = x.clone() # make an exact copy to allow safe manipulations of the image
