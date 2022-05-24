@@ -19,7 +19,7 @@ def psnr(denoised , ground_truth):
     """
     # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
     denoised = denoised.float()
-    ground_truth = ground_truth.float()/255
+    ground_truth = ground_truth.float()
     mse = torch.mean((denoised - ground_truth) ** 2)
     return -10 * torch.log10(mse + 10**-8)
 
@@ -259,7 +259,7 @@ class Model(nn.Module) :
         Outputs:
             * (tensor of size (N1, C, H, W)) denoised version of the input
         """
-        return self.model(test_input.float()/255)        
+        return self.model(test_input.float())        
 
 #####################################################################
 
