@@ -4,6 +4,8 @@ from torch.nn.functional import fold, unfold
 #from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
 from others.otherfile1 import *
 import random, math
+from torch import autograd
+autograd.set_detect_anomaly(True)
 random.seed(0)
 manual_seed(0)
 
@@ -85,7 +87,7 @@ class Conv2d(Module):
             for x_old in self.input:
                 unfolded = unfold(x_old.unsqueeze(0), kernel_size=self.kernel_size)
                 #print("view", (dl_ds.view(self.out_chan, -1).shape))
-                if (torch.isnan(dl_ds.reshape(self.out_chan, unfolded.shape[2]))).any():
+                if (torch.isnan(dl_ds).any()):
                     print("nan")
                     break
                 self.w_grad.add_((dl_ds.reshape(self.out_chan, unfolded.shape[2]) @ unfolded.squeeze(0).t()).view(self.w_grad.size()))
@@ -218,6 +220,7 @@ class Model(Module):
                 target = train_target[b: b+ self.mini_batch_size]
                 #forward pass for the model sequential
                 output = self.model.forward(input)
+                print("out", output.shape)
 
                 #loss at the end of the forward pass
                 loss = self.criterion.forward(output,target)
