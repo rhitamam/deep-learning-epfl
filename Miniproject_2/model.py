@@ -129,9 +129,9 @@ class Conv2d(Module):
 
     def zero_grad(self):
         'set all the gradient of the weight and the bias to zero'
-        self.w_grad = zeros(self.weights.shape)
+        self.w_grad = empty(self.weights.shape).normal_()
         if self.bias_bool:
-            self.b_grad = zeros(self.bias.shape)
+            self.b_grad = empty(self.bias.shape).normal_()
 
 
     def set_weights_and_bias(self, weights, bias):
@@ -347,7 +347,7 @@ class MSE(Module) :
         self.tensor = input
         self.target = target
         #print('mse', MSE_func(input, target))
-        return MSE_func(input, target)/ self.tensor.shape[0]
+        return MSE_func(input, target)
 
     def backward (self):
         #print("dmse", (dMSE(self.tensor, self.target))/ self.tensor.shape[0])
