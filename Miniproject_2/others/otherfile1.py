@@ -5,7 +5,7 @@ random.seed(0)
 manual_seed(0)
 
 def MSE_func(v, t):
-    return (v - t).pow(2).sum()
+    return (v - t).pow(2).mean()
 
 def dMSE(v, t):
     return 2 * (v - t)
