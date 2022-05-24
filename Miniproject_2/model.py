@@ -17,6 +17,7 @@ class Module(object) :
     def param (self) :
         return []
 
+
 class Conv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
         self.in_chan = in_channels
@@ -31,6 +32,7 @@ class Conv2d(Module):
         self.b_grad = empty(self.bias.shape)
         self.input = Tensor()
     
+
     def forward (self,  input) :
         self.input = input
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
@@ -51,7 +53,7 @@ class Conv2d(Module):
                             dilation=self.dilation, 
                             padding=self.padding, 
                             stride=self.stride)
-        print ("unfolded", unfolded.view((-1, self.input.shape[1], gradwrtoutput.shape[2], gradwrtoutput.shape[3])).squeeze().shape)
+        #print ("unfolded", unfolded.view((-1, self.input.shape[1], gradwrtoutput.shape[2], gradwrtoutput.shape[3])).squeeze().shape)
         self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
         
         if self.bias_bool:
@@ -72,21 +74,27 @@ class Conv2d(Module):
                         padding=self.padding, 
                         stride=self.stride)
                   '''  
-        print('w g', self.w_grad.shape)
-        print('b g', self.b_grad.shape)    
+        #print('w g', self.w_grad.shape)
+        #print('b g', self.b_grad.shape)  
+        #print("b conv out", dl_dx_old.shape)  
         return dl_dx_old
     
+
     def backward(self, gradwrtoutput):
         dl_dx_old = []
-        print("b conv")
+        #print("b conv")
         for dl_ds in gradwrtoutput:
             dl_dx_old_j = self.weights.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
-            dl_dx_old_j = fold(dl_dx_old_j, output_size=self.input.shape[2:], kernel_size=self.kernel_size)
+            dl_dx_old_j = fold(dl_dx_old_j, output_size=self.input.shape[2:], kernel_size=self.kernel_size, dilation= self.dilation, padding= self.padding,stride=self.stride)
             dl_dx_old.append(dl_dx_old_j)
             
             for x_old in self.input:
-                unfolded = unfold(x_old.unsqueeze(0), kernel_size=self.kernel_size)
-                #print("view", (dl_ds.view(self.out_chan, -1).shape))
+                unfolded = unfold(x_old.unsqueeze(0), 
+                                    kernel_size=self.kernel_size, 
+                                    dilation=self.dilation, 
+                                    padding=self.padding, 
+                                    stride=self.stride)
+                #print("unfold", unfolded.shape)
                 if (torch.isnan(dl_ds).any()):
                     print("nan")
                     break
@@ -96,9 +104,11 @@ class Conv2d(Module):
             self.b_grad = gradwrtoutput.sum((0,2,3))
         
         dl_dx_old = torch.cat(dl_dx_old)
-        print('w g', self.w_grad.shape)
-        print('b g', self.b_grad.shape)
+        #print('w g', self.w_grad.shape)
+        #print('b g', self.b_grad.shape)
+        #print("b conv out", dl_dx_old.shape)
         return (dl_dx_old)
+
 
     def param(self):
         """
@@ -111,11 +121,13 @@ class Conv2d(Module):
         else:
             [(self.weights, self.w_grad)]
 
+
     def zero_grad(self):
         'set all the gradient of the weight and the bias to zero'
         self.w_grad = empty(self.weights.shape)
         if self.bias_bool:
             self.b_grad = empty(self.bias.shape)
+
 
     def set_weights_and_bias(self, weights, bias):
         self.weights = weights
@@ -127,10 +139,12 @@ class NearestUpSampling(Module) :
     def __init__(self,scalefactor):
         self.scalefactor = scalefactor
     
+
     def forward(self, input):
         first = repeat_interleave(input, 2, dim=3)
-        final =  repeat_interleave(first,2,dim=2)        
+        final =  repeat_interleave(first,2,dim=2)
         return final
+
 
     def backward(self, gradwrtoutput):
         if isinstance(gradwrtoutput,tuple):
@@ -156,24 +170,27 @@ class Sequential(Module) :
         self.modules = modules
         self.input = Tensor()
 
+
     def forward (self, input) :
         out = input
         for module in self.modules:
             out = module.forward(out)
-
         self.input = out
         return out
     
+
     def backward (self, gradwrtoutput):
         for module in reversed(self.modules):
             gradwrtoutput = module.backward(gradwrtoutput)
         return gradwrtoutput
     
+
     def param (self) :
         'should return multiple params'
         param = [m.param() for m in self.modules]
         return param
     
+
     def zero_grad(self) :
         'set all the gradient of the weight and the bias to zero'
         for m in self.modules:
@@ -186,17 +203,15 @@ class Model(Module):
         #define the model
         in_channels = 3
         out_channels = 3
-        self.model = Sequential(Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=10), 
+        self.model = Sequential(Conv2d(in_channels=in_channels, out_channels=48, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
                 ReLU(),
-                Conv2d(in_channels= out_channels, out_channels= out_channels, kernel_size=10), 
+                Conv2d(in_channels= 48, out_channels= 64, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
                 ReLU(), 
                 NearestUpSampling(2), 
-                Conv2d(out_channels, out_channels, kernel_size=5), 
-                Conv2d(out_channels, out_channels, kernel_size=5), 
+                Conv2d(in_channels=64, out_channels= 32, kernel_size=(3,3), stride=(1,1), padding=(1,1)), 
                 ReLU(),
                 NearestUpSampling(2), 
-                Conv2d(out_channels, in_channels, kernel_size=5),
-                Conv2d(out_channels, out_channels, kernel_size=5), 
+                Conv2d(in_channels=32, out_channels= 3, kernel_size=(3,3), stride=(1,1), padding=(1,1)),
                 Sigmoid())
         self.mini_batch_size = 100
         self.criterion = MSE()
@@ -205,14 +220,21 @@ class Model(Module):
         self.momentum = 0.9
         self.optimizer = SGD(self.model, lr=self.lr, momentum=self.momentum)
 
+
     def set_lr(self, lr):
         self.lr = lr
+
 
     def set_momentum(self, momentum):
         self.momentum = momentum
         
         
     def train(self, train_input, train_target, num_epochs, save_model = False) :
+
+        #: normalize the input data
+        train_input = train_input.float() / 255
+        train_target= train_target.float() / 255
+
         for epoch in range(num_epochs) :
             acc_loss = 0
             for b in range(0, train_input.size(0), self.mini_batch_size):
@@ -220,7 +242,6 @@ class Model(Module):
                 target = train_target[b: b+ self.mini_batch_size]
                 #forward pass for the model sequential
                 output = self.model.forward(input)
-                print("out", output.shape)
 
                 #loss at the end of the forward pass
                 loss = self.criterion.forward(output,target)
@@ -240,8 +261,7 @@ class Model(Module):
             print(epoch, acc_loss)
 
         if save_model:
-            self.save_model("bestmodel.pth")
-            
+            self.save_model("bestmodel.pth")           
 
     def predict(self, test_input):
         return self.model.forward(test_input)
@@ -284,7 +304,6 @@ class Model(Module):
         ground_truth = ground_truth.float()/255
         mse = torch.mean((denoised - ground_truth) ** 2)
         return -10 * torch.log10(mse + 10**-8)
-
        
 
 class MSE(Module) :
@@ -376,14 +395,15 @@ random.seed(0)
 torch.manual_seed(0)
 
 noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1[:50] / 255.0
-noisy_imgs_2 = noisy_imgs_2[:50]/ 255.0
+noisy_imgs_1 = noisy_imgs_1[:50].float()
+noisy_imgs_2 = noisy_imgs_2[:50].float()
 noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
-noisy_imgs = noisy_imgs[:50] / 255.0
-clean_imgs = clean_imgs[:50] / 255.0
+noisy_imgs = noisy_imgs[:50].float()
+clean_imgs = clean_imgs[:50].float() / 255.0
 
 model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 2, save_model=True)
+model.train(noisy_imgs_1, noisy_imgs_2, 3, save_model=True)
 prediction = model.predict(noisy_imgs)
+prediction = prediction / 255.0
 nb_test_errors = model.psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
