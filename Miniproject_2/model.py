@@ -270,7 +270,7 @@ class Model(Module):
        
 
 class SGD(object) :
-    def __init__(self, module, lr=0.1, momentum=0.9):
+    def __init__(self, module, lr=0.01, momentum=0.9):
         self.module = module
         self.lr = lr
         self.momentum = momentum
