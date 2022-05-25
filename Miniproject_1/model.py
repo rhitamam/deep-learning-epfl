@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+from pathlib import Path
 torch.manual_seed(0)
 
 
@@ -215,7 +216,8 @@ class Model(nn.Module) :
         """
         Loads the parameters saved in bestmodel .pth into the model
         """
-        return self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth", map_location=torch.device('cpu')))
+        model_path = Path(__file__).parent / "bestmodel.pth"
+        return self.model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
         #self.model.eval()
             
 

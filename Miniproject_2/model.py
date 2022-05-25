@@ -1,9 +1,10 @@
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
-from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
-#from others.otherfile1 import *
+#from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
+from others.otherfile1 import *
 import random, math
 import pickle
+from pathlib import Path
 
 random.seed(0)
 manual_seed(0)
@@ -279,19 +280,30 @@ class Model(Module):
         return self.model.forward(test_input) * 255
 
     def load_pretrained_model(self):
-        with open("Miniproject_2/bestmodel.pth", "rb") as f:
+        '''
+        loaded = load("Miniproject_2/bestmodel.pth", map_location=torch.device('cpu'))
+        print(loaded)
+        #self.model.eval()
+        '''
+        model_path = Path(__file__).parent / "bestmodel.pth"
+        with open(model_path, "rb") as f:
             loaded_dict = pickle.load(f)
         i = 0
         for m in self.model.modules:
             if isinstance(m, Conv2d):
-                weight = loaded_dict['c' + str(i)]["weight"]
+                weight = loaded_dict['c' + str(i)]['weights']
                 bias = loaded_dict['c' + str(i)]["bias"]
-                m.set_weight_and_bias(weight, bias)   
+                m.set_weight_and_bias(weight, bias)  
+                i+=1 
         return self.model
+        
 
     def save_model(self, FILE) :
         #store each of the modules’ states in a pickle file
         #make the dictionnary
+
+        print("save the model as " + FILE)
+        model_dict = {}
         if isinstance(FILE, str):
             model_dict = {}
             i = 0
@@ -307,6 +319,7 @@ class Model(Module):
                 pickle.dump(model_dict, f)
         else:
             raise RuntimeError('Error: FILE must be a string')
+            
     
     def psnr(self, denoised , ground_truth):
         # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
@@ -393,7 +406,7 @@ from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
 
-'''
+
 noisy_imgs_1 , noisy_imgs_2 = torch.load('data/train_data.pkl')
 noisy_imgs_1 = noisy_imgs_1[:10].float()
 noisy_imgs_2 = noisy_imgs_2[:10].float()
@@ -412,4 +425,10 @@ print('test error Net', nb_test_errors)
 newmodel = Model()
 newmodel = newmodel.load_pretrained_model()
 print(newmodel.modules)
-'''
+
+
+
+from Miniproject_2.others.otherfile1 import *
+from pathlib import Path
+model_path = Path(__file__).parent / "bestmodel.pth"
+model = torch.load(model_path) 
