@@ -3,7 +3,7 @@ from torch.nn.functional import fold, unfold
 #from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
 from others.otherfile1 import *
 import random, math
-from torch import zeros
+import pickle
 
 random.seed(0)
 manual_seed(0)
@@ -35,6 +35,7 @@ class Conv2d(Module):
     def forward (self,  input) :
         self.input = input
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
+        #print('unfolded', np.count_nonzero(unfolded), unfolded.shape)
         wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
         if (torch.isnan(self.weights).any()):
                     raise RuntimeError('Error: Nan weights')
@@ -42,6 +43,7 @@ class Conv2d(Module):
                     self.out_chan,
                     math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
                     math.floor(1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[0]))
+        #print('out', output)
         return output
         
     def backward_bis(self, gradwrtoutput):
@@ -180,6 +182,7 @@ class Sequential(Module) :
         out = input
         for module in self.modules:
             out = module.forward(out)
+            print('out', out.max())
         self.input = out
         return out
     
@@ -206,23 +209,22 @@ class Sequential(Module) :
 class Model(Module):
     def __init__(self) :
         #define the model
-        in_channels = 3
-        out_channels = 3
-        self.model = Sequential(Conv2d(in_channels=in_channels, out_channels=48, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
+
+        self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
                 ReLU(),
-                Conv2d(in_channels= 48, out_channels= 64, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
+                Conv2d(in_channels=48, out_channels=64, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
                 ReLU(), 
                 NearestUpSampling(2), 
-                Conv2d(in_channels=64, out_channels= 32, kernel_size=(3,3), stride=(1,1), padding=(1,1)), 
+                Conv2d(in_channels=64, out_channels=32, kernel_size=(3,3), stride=(1,1), padding=(1,1)), 
                 ReLU(),
                 NearestUpSampling(2), 
-                Conv2d(in_channels=32, out_channels= 3, kernel_size=(3,3), stride=(1,1), padding=(1,1)),
+                Conv2d(in_channels=32, out_channels=3, kernel_size=(3,3), stride=(1,1), padding=(1,1)),
                 Sigmoid())
 
         self.mini_batch_size = 100
         self.criterion = MSE()
         #define the optimizer
-        self.lr = 0.1
+        self.lr = 0.01
         self.momentum = 0.9
         self.optimizer = SGD(self.model, lr=self.lr, momentum=self.momentum)
 
@@ -252,7 +254,7 @@ class Model(Module):
 
                 #forward pass for the model sequential  
                 output = self.model.forward(input)
-                print(output)
+                print(output[:1])
 
                 #loss at the end of the forward pass
                 loss = self.criterion.forward(output,target)
@@ -276,10 +278,9 @@ class Model(Module):
             self.save_model("bestmodel.pth")           
 
     def predict(self, test_input):
-        return self.model.forward(test_input)
+        return self.model.forward(test_input) * 255
 
     def load_pretrained_model(self):
-        import pickle
         with open("Miniproject_2/bestmodel.pth", "rb") as f:
             loaded_dict = pickle.load(f)
         i = 0
@@ -292,7 +293,6 @@ class Model(Module):
 
     def save_model(self, FILE) :
         #store each of the modules’ states in a pickle file
-        import pickle
         #make the dictionnary
         if isinstance(FILE, str):
             model_dict = {}
@@ -313,9 +313,9 @@ class Model(Module):
     def psnr(self, denoised , ground_truth):
         # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
         denoised = denoised.float()
-        ground_truth = ground_truth.float()/255
-        mse = torch.mean((denoised - ground_truth) ** 2)
-        return -10 * torch.log10(mse + 10**-8)
+        ground_truth = ground_truth.float()
+        mse = ((denoised - ground_truth) ** 2).mean()
+        return -10 * math.log10(mse + 10**-8)
        
 
 class SGD(object) :
@@ -366,6 +366,7 @@ class ReLU(Module) :
         return ReLU_func(input)
 
     def backward (self, gradwrtoutput):
+        #print('relu', (gradwrtoutput * dReLU(self.tensor))[:1])
         return gradwrtoutput * dReLU(self.tensor)
 
     def param (self) :
@@ -399,12 +400,15 @@ noisy_imgs_1 = noisy_imgs_1[:10].float()
 noisy_imgs_2 = noisy_imgs_2[:10].float()
 noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
 noisy_imgs = noisy_imgs[:10].float()
-clean_imgs = clean_imgs[:10].float() / 255.0
+clean_imgs = clean_imgs[:10].float()
 
 model = Model()
 model.train(noisy_imgs_1, noisy_imgs_2, 4)
 prediction = model.predict(noisy_imgs)
-prediction = prediction / 255.0
+print(noisy_imgs.min(), noisy_imgs.max())
+print(prediction.min(), prediction.max())
+prediction = prediction.float() / 255.0
+clean_imgs = clean_imgs.float() / 255.0
 nb_test_errors = model.psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
 
