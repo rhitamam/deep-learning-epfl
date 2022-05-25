@@ -1,7 +1,7 @@
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
-#from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
-from others.otherfile1 import *
+from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
+#from others.otherfile1 import *
 import random, math
 import pickle
 
@@ -26,8 +26,8 @@ class Conv2d(Module):
         self.padding = int_to_tuple(padding)
         self.dilation = int_to_tuple(dilation)
         self.bias_bool = bias
-        self.weights, self.bias = initialize(in_channels, out_channels, self.kernel_size, bias)
-        self.w_grad = empty(self.weights.shape)
+        self.weight, self.bias = initialize(in_channels, out_channels, self.kernel_size, bias)
+        self.w_grad = empty(self.weight.shape)
         self.b_grad = empty(self.bias.shape)
         self.input = Tensor()
     
@@ -36,9 +36,9 @@ class Conv2d(Module):
         self.input = input
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         #print('unfolded', np.count_nonzero(unfolded), unfolded.shape)
-        wxb = self.weights.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
-        if (torch.isnan(self.weights).any()):
-                    raise RuntimeError('Error: Nan weights')
+        wxb = self.weight.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
+        if (torch.isnan(self.weight).any()):
+                    raise RuntimeError('Error: Nan weight')
         output = wxb.view(input.shape[0], 
                     self.out_chan,
                     math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
@@ -64,7 +64,7 @@ class Conv2d(Module):
 
         dl_dx_old = empty(self.input.shape)
         for idx, dl_ds in enumerate(gradwrtoutput):  # torch autograd jacobian cf slides torch autograd.grad
-            dl_dx_prev = self.weights.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1)
+            dl_dx_prev = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1)
             # CHECK FIRST !!! FOLD UNFOLD CONSISTENCY
             dl_dx_prev_folded = fold(dl_dx_prev, output_size=self.input.size()[2:], kernel_size=self.kernel_size, stride=self.stride)
             dl_dx_old[idx] = dl_dx_prev_folded
@@ -92,7 +92,7 @@ class Conv2d(Module):
             raise RuntimeError('Error: Nan gwto')
         for dl_ds in gradwrtoutput:
             
-            dl_dx_old_j = self.weights.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
+            dl_dx_old_j = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
             dl_dx_old_j = fold(dl_dx_old_j, output_size=self.input.shape[2:], kernel_size=self.kernel_size, dilation= self.dilation, padding= self.padding,stride=self.stride)
             dl_dx_old.append(dl_dx_old_j)
             
@@ -124,20 +124,20 @@ class Conv2d(Module):
             * list of pairs composed of a parameter tensor and a gradient tensor
         """
         if self.bias_bool:
-            return [(self.weights, self.w_grad), (self.bias, self.b_grad)]
+            return [(self.weight, self.w_grad), (self.bias, self.b_grad)]
         else:
-            [(self.weights, self.w_grad)]
+            [(self.weight, self.w_grad)]
 
 
     def zero_grad(self):
         'set all the gradient of the weight and the bias to zero'
-        self.w_grad = empty(self.weights.shape).normal_()
+        self.w_grad = empty(self.weight.shape).normal_()
         if self.bias_bool:
             self.b_grad = empty(self.bias.shape).normal_()
 
 
-    def set_weights_and_bias(self, weights, bias):
-        self.weights = weights
+    def set_weight_and_bias(self, weight, bias):
+        self.weight = weight
         if self.bias_bool:
             self.bias = bias
         
@@ -155,20 +155,20 @@ class NearestUpSampling(Module) :
 
     def backward(self, gradwrtoutput):
         if isinstance(gradwrtoutput,tuple):
-            weights, bias = gradwrtoutput
+            weight, bias = gradwrtoutput
         else:
-            weights = gradwrtoutput
-        u = unfold(weights,kernel_size=self.scalefactor, stride=2)
-        viewed = u.view(weights.shape[0],
-                        weights.size()[1],
+            weight = gradwrtoutput
+        u = unfold(weight,kernel_size=self.scalefactor, stride=2)
+        viewed = u.view(weight.shape[0],
+                        weight.size()[1],
                         self.scalefactor*self.scalefactor,
-                        int((weights.size()[2]/self.scalefactor)*(weights.size()[2]/self.scalefactor)))
+                        int((weight.size()[2]/self.scalefactor)*(weight.size()[2]/self.scalefactor)))
         to_mean = viewed.transpose(1,1).transpose(2,3)
         meaned = to_mean.mean(axis=3)
-        final = meaned.view(weights.size()[0],
-                            weights.size()[1],
-                            int(weights.size()[2]/2),
-                            int(weights.size()[2]/2))
+        final = meaned.view(weight.size()[0],
+                            weight.size()[1],
+                            int(weight.size()[2]/2),
+                            int(weight.size()[2]/2))
         return final
 
 
@@ -284,9 +284,9 @@ class Model(Module):
         i = 0
         for m in self.model.modules:
             if isinstance(m, Conv2d):
-                weight = loaded_dict['c' + str(i)]["weights"]
+                weight = loaded_dict['c' + str(i)]["weight"]
                 bias = loaded_dict['c' + str(i)]["bias"]
-                m.set_weights_and_bias(weight, bias)   
+                m.set_weight_and_bias(weight, bias)   
         return self.model
 
     def save_model(self, FILE) :
@@ -298,7 +298,7 @@ class Model(Module):
             for m in self.model.modules:
                 if isinstance(m, Conv2d):
                     sub_dict= {}
-                    sub_dict['weights'] = m.weights
+                    sub_dict['weight'] = m.weight
                     sub_dict['bias'] = m.bias
                     model_dict['c' + str(i)] = sub_dict
                     i+=1
@@ -326,9 +326,9 @@ class SGD(object) :
         param = self.module.param()       
         for p, m in zip(param, self.module.modules):
             if isinstance(m, Conv2d):
-                weights = p[0][0] - (self.lr * p[0][1])
+                weight = p[0][0] - (self.lr * p[0][1])
                 bias = p[1][0] - (self.lr * p[1][1])
-                m.set_weights_and_bias(weights, bias)
+                m.set_weight_and_bias(weight, bias)
     
 
     def zero_grad(self) :
@@ -393,18 +393,23 @@ from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
 
-noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
+'''
+noisy_imgs_1 , noisy_imgs_2 = torch.load('data/train_data.pkl')
 noisy_imgs_1 = noisy_imgs_1[:10].float()
 noisy_imgs_2 = noisy_imgs_2[:10].float()
-noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
+noisy_imgs, clean_imgs = torch.load('data/val_data.pkl')
 noisy_imgs = noisy_imgs[:10].float()
 clean_imgs = clean_imgs[:10].float()
 
 model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 4)
+model.train(noisy_imgs_1, noisy_imgs_2, 4, save_model=True)
 prediction = model.predict(noisy_imgs)
 prediction = prediction.float() / 255.0
 clean_imgs = clean_imgs.float() / 255.0
 nb_test_errors = model.psnr(prediction, clean_imgs)
 print('test error Net', nb_test_errors)
 
+newmodel = Model()
+newmodel = newmodel.load_pretrained_model()
+print(newmodel.modules)
+'''
