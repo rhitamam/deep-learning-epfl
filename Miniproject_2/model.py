@@ -182,7 +182,6 @@ class Sequential(Module) :
         out = input
         for module in self.modules:
             out = module.forward(out)
-            print('out', out.max())
         self.input = out
         return out
     
@@ -210,15 +209,15 @@ class Model(Module):
     def __init__(self) :
         #define the model
 
-        self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
+        self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=5, stride=2, padding=2), 
                 ReLU(),
-                Conv2d(in_channels=48, out_channels=64, kernel_size=(3,3), stride=(2,2), padding=(1,1)), 
+                Conv2d(in_channels=48, out_channels=64, kernel_size=5, stride=2, padding=2), 
                 ReLU(), 
                 NearestUpSampling(2), 
-                Conv2d(in_channels=64, out_channels=32, kernel_size=(3,3), stride=(1,1), padding=(1,1)), 
+                Conv2d(in_channels=64, out_channels=32, kernel_size=5, stride=1, padding=2), 
                 ReLU(),
                 NearestUpSampling(2), 
-                Conv2d(in_channels=32, out_channels=3, kernel_size=(3,3), stride=(1,1), padding=(1,1)),
+                Conv2d(in_channels=32, out_channels=3, kernel_size=5, stride=1, padding=2),
                 Sigmoid())
 
         self.mini_batch_size = 100
@@ -254,7 +253,6 @@ class Model(Module):
 
                 #forward pass for the model sequential  
                 output = self.model.forward(input)
-                print(output[:1])
 
                 #loss at the end of the forward pass
                 loss = self.criterion.forward(output,target)
@@ -405,8 +403,6 @@ clean_imgs = clean_imgs[:10].float()
 model = Model()
 model.train(noisy_imgs_1, noisy_imgs_2, 4)
 prediction = model.predict(noisy_imgs)
-print(noisy_imgs.min(), noisy_imgs.max())
-print(prediction.min(), prediction.max())
 prediction = prediction.float() / 255.0
 clean_imgs = clean_imgs.float() / 255.0
 nb_test_errors = model.psnr(prediction, clean_imgs)
