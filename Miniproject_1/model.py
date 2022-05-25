@@ -215,7 +215,7 @@ class Model(nn.Module) :
         """
         Loads the parameters saved in bestmodel .pth into the model
         """
-        return self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth"))
+        return self.model.load_state_dict(torch.load("Miniproject_1/bestmodel.pth", map_location=torch.device('cpu')))
         #self.model.eval()
             
 
