@@ -34,59 +34,17 @@ class Conv2d(Module):
     
 
     def forward (self,  input) :
-        self.input = input
-        unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
-        #print('unfolded', np.count_nonzero(unfolded), unfolded.shape)
+        self.input = input.float()
+        unfolded = unfold(input.float(), kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         wxb = self.weight.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
         output = wxb.view(input.shape[0], 
                     self.out_chan,
                     math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
                     math.floor(1+(input.shape[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[0]))
-        #print('out', output)
         return output
-        
-    def backward_bis(self, gradwrtoutput):
-        ''' 
-        unfolded = unfold(self.input, kernel_size=self.kernel_size)
-        self.w_grad = (gradwrtoutput.view(self.out_chan, -1) @ unfolded).view(self.w_grad.size())
-        '''
-        unfolded = unfold(self.input, 
-                            kernel_size=self.kernel_size, 
-                            dilation=self.dilation, 
-                            padding=self.padding, 
-                            stride=self.stride)
-        #print ("unfolded", unfolded.view((-1, self.input.shape[1], gradwrtoutput.shape[2], gradwrtoutput.shape[3])).squeeze().shape)
-        self.w_grad =  gradwrtoutput @ unfolded.view((self.input.shape[0], self.input.shape[1], gradwrtoutput.shape[2], -1))
-        
-        if self.bias_bool:
-            self.b_grad = gradwrtoutput.sum((0,2,3))
-
-        dl_dx_old = empty(self.input.shape)
-        for idx, dl_ds in enumerate(gradwrtoutput):  # torch autograd jacobian cf slides torch autograd.grad
-            dl_dx_prev = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1)
-            # CHECK FIRST !!! FOLD UNFOLD CONSISTENCY
-            dl_dx_prev_folded = fold(dl_dx_prev, output_size=self.input.size()[2:], kernel_size=self.kernel_size, stride=self.stride)
-            dl_dx_old[idx] = dl_dx_prev_folded
-        #dl_dx_old = dl_dx_old.view((self.input.shape[0], self.input.shape[1], self.input.shape[2],-1))
-        '''
-        dl_dx_old = fold(dl_dx_old, 
-                        output_size=self.input.shape[2:], 
-                        kernel_size=self.kernel_size, 
-                        dilation=self.dilation, 
-                        padding=self.padding, 
-                        stride=self.stride)
-                  '''  
-        #print('w g', self.w_grad.shape)
-        #print('b g', self.b_grad.shape)  
-        #print("b conv out", dl_dx_old.shape)  
-        print(dl_dx_old)
-
-        return dl_dx_old
-    
 
     def backward(self, gradwrtoutput):
         dl_dx_old = []
-        #print("b conv")
         for dl_ds in gradwrtoutput:
             
             dl_dx_old_j = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
@@ -99,7 +57,6 @@ class Conv2d(Module):
                                     dilation=self.dilation, 
                                     padding=self.padding, 
                                     stride=self.stride)
-                #print("unfold", unfolded.shape)
                 
                 self.w_grad.add_((dl_ds.reshape(self.out_chan, unfolded.shape[2]) @ unfolded.squeeze(0).t()).view(self.w_grad.size()))
         
@@ -248,7 +205,6 @@ class Model(Module):
                 #loss at the end of the forward pass
                 loss = self.criterion.forward(output,target)
 
-                #print('loss', loss)
                 acc_loss += loss
 
                 #set the gradients to zero before starting to do backpropragation
@@ -264,24 +220,19 @@ class Model(Module):
             print(epoch, acc_loss)
 
         if save_model:
-            self.save_model("bestmodel.pth")           
+            self.save_model("Miniproject_2/bestmodel.pth")           
 
     def predict(self, test_input):
         return self.model.forward(test_input) * 255
 
     def load_pretrained_model(self):
-        '''
-        loaded = load("Miniproject_2/bestmodel.pth", map_location=torch.device('cpu'))
-        print(loaded)
-        #self.model.eval()
-        '''
         model_path = Path(__file__).parent / "bestmodel.pth"
         with open(model_path, "rb") as f:
             loaded_dict = pickle.load(f)
         i = 0
         for m in self.model.modules:
             if isinstance(m, Conv2d):
-                weight = loaded_dict['c' + str(i)]['weights']
+                weight = loaded_dict['c' + str(i)]['weight']
                 bias = loaded_dict['c' + str(i)]["bias"]
                 m.set_weight_and_bias(weight, bias)  
                 i+=1 
@@ -291,7 +242,6 @@ class Model(Module):
     def save_model(self, FILE) :
         #store each of the modules’ states in a pickle file
         #make the dictionnary
-
         print("save the model as " + FILE)
         model_dict = {}
         if isinstance(FILE, str):
@@ -347,11 +297,9 @@ class MSE(Module) :
     def forward (self, input, target):
         self.tensor = input
         self.target = target
-        #print('mse', MSE_func(input, target))
         return MSE_func(input, target)
 
     def backward (self):
-        #print("dmse", (dMSE(self.tensor, self.target))/ self.tensor.shape[0])
         return dMSE(self.tensor, self.target)/ self.tensor.shape[0]
 
     def param (self) :
@@ -367,7 +315,6 @@ class ReLU(Module) :
         return ReLU_func(input)
 
     def backward (self, gradwrtoutput):
-        #print('relu', (gradwrtoutput * dReLU(self.tensor))[:1])
         return gradwrtoutput * dReLU(self.tensor)
 
     def param (self) :
@@ -390,13 +337,13 @@ class Sigmoid(Module):
         
 
 #==============================================================================
-'''
+
 import torch
 from torch.nn import functional
 random.seed(0)
 torch.manual_seed(0)
 
-
+'''
 noisy_imgs_1 , noisy_imgs_2 = torch.load('data/train_data.pkl')
 noisy_imgs_1 = noisy_imgs_1[:10].float()
 noisy_imgs_2 = noisy_imgs_2[:10].float()
@@ -416,10 +363,4 @@ newmodel = Model()
 newmodel = newmodel.load_pretrained_model()
 print(newmodel.modules)
 
-
-
-from Miniproject_2.others.otherfile1 import *
-from pathlib import Path
-model_path = Path(__file__).parent / "bestmodel.pth"
-model = torch.load(model_path) 
 '''
