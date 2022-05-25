@@ -1,7 +1,7 @@
 from torch import empty , cat , arange, Tensor, manual_seed, repeat_interleave
 from torch.nn.functional import fold, unfold
-#from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
-from others.otherfile1 import *
+from Miniproject_2.others.otherfile1 import * #To uncomment for the final submission
+#from others.otherfile1 import *
 import random, math
 import pickle
 from pathlib import Path
@@ -38,8 +38,6 @@ class Conv2d(Module):
         unfolded = unfold(input, kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         #print('unfolded', np.count_nonzero(unfolded), unfolded.shape)
         wxb = self.weight.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
-        if (torch.isnan(self.weight).any()):
-                    raise RuntimeError('Error: Nan weight')
         output = wxb.view(input.shape[0], 
                     self.out_chan,
                     math.floor(1+(input.shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0]),
@@ -89,8 +87,6 @@ class Conv2d(Module):
     def backward(self, gradwrtoutput):
         dl_dx_old = []
         #print("b conv")
-        if (torch.isnan(gradwrtoutput).any()):
-            raise RuntimeError('Error: Nan gwto')
         for dl_ds in gradwrtoutput:
             
             dl_dx_old_j = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
@@ -104,17 +100,13 @@ class Conv2d(Module):
                                     padding=self.padding, 
                                     stride=self.stride)
                 #print("unfold", unfolded.shape)
-                if (torch.isnan(dl_ds).any()):
-                    raise RuntimeError('Error: Nan dl_ds')
                 
                 self.w_grad.add_((dl_ds.reshape(self.out_chan, unfolded.shape[2]) @ unfolded.squeeze(0).t()).view(self.w_grad.size()))
-                if (torch.isnan(self.w_grad).any()):
-                    raise RuntimeError('Error: Nan w grad add')
         
         if self.bias_bool:
             self.b_grad = gradwrtoutput.sum((0,2,3))
         
-        dl_dx_old = torch.cat(dl_dx_old)
+        dl_dx_old = cat(dl_dx_old)
         return (dl_dx_old)
 
 
@@ -210,15 +202,15 @@ class Model(Module):
     def __init__(self) :
         #define the model
 
-        self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=5, stride=2, padding=2), 
+        self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=3, stride=2, padding=1), 
                 ReLU(),
-                Conv2d(in_channels=48, out_channels=64, kernel_size=5, stride=2, padding=2), 
+                Conv2d(in_channels=48, out_channels=64, kernel_size=3, stride=2, padding=1), 
                 ReLU(), 
                 NearestUpSampling(2), 
-                Conv2d(in_channels=64, out_channels=32, kernel_size=5, stride=1, padding=2), 
+                Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1), 
                 ReLU(),
                 NearestUpSampling(2), 
-                Conv2d(in_channels=32, out_channels=3, kernel_size=5, stride=1, padding=2),
+                Conv2d(in_channels=32, out_channels=3, kernel_size=3, stride=1, padding=1),
                 Sigmoid())
 
         self.mini_batch_size = 100
@@ -248,8 +240,6 @@ class Model(Module):
             for b in range(0, train_input.size(0), self.mini_batch_size):
                 
                 input = train_input[b: b + self.mini_batch_size]
-                if (torch.isnan(input).any()):
-                    raise RuntimeError('Error: Nan inpout')
                 target = train_target[b: b+ self.mini_batch_size]
 
                 #forward pass for the model sequential  
@@ -400,7 +390,7 @@ class Sigmoid(Module):
         
 
 #==============================================================================
-
+'''
 import torch
 from torch.nn import functional
 random.seed(0)
@@ -432,3 +422,4 @@ from Miniproject_2.others.otherfile1 import *
 from pathlib import Path
 model_path = Path(__file__).parent / "bestmodel.pth"
 model = torch.load(model_path) 
+'''
