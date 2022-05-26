@@ -96,7 +96,9 @@ class Conv2d(Module):
 
 
     def zero_grad(self):
-        'set all the gradient of the weight and the bias to zero'
+        """
+        Set all the gradient of the weight and the bias to zero
+        """
         self.w_grad = empty(self.weight.shape).normal_()
         if self.bias_bool:
             self.b_grad = empty(self.bias.shape).normal_()
