@@ -174,7 +174,6 @@ class Sequential(Module) :
 class Model(Module):
     def __init__(self) :
         #define the model
-
         self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=3, stride=2, padding=1), 
                 ReLU(),
                 Conv2d(in_channels=48, out_channels=64, kernel_size=3, stride=2, padding=1), 
@@ -185,8 +184,9 @@ class Model(Module):
                 NearestUpSampling(2), 
                 Conv2d(in_channels=32, out_channels=3, kernel_size=3, stride=1, padding=1),
                 Sigmoid())
-
+        #define the batch size
         self.mini_batch_size = 100
+        #define the loss criterion
         self.criterion = MSE()
         #define the optimizer
         self.lr = 0.001
@@ -203,7 +203,14 @@ class Model(Module):
         
         
     def train(self, train_input, train_target, num_epochs, save_model = False) :
-
+        """
+        Train the model with train_input and train_target and save the trained model if argument save_model is seet to True.
+        Inputs:
+            * train_input (tensor) - Tensor containing a set of corrupted images (not normalized) to use for training the denoiser
+            * train_target (tensor) - Tensor containing a set of corrupted images (not normalized) to use for computing the loss
+            * num_epoch (int) - Number of the epochs to perform for the training
+            * save_model (bool) - Default False.
+        """
         #: normalize the input data
         train_input = train_input.float() / 255
         train_target= train_target.float() / 255
