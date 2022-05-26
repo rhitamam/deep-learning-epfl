@@ -34,6 +34,14 @@ class Conv2d(Module):
     
 
     def forward (self,  input) :
+        """
+        Return a convoluted tensor.
+
+        Inputs:
+            * input (tensor) - Tensor containing the input tensor to convolute with a tensor of weights.
+        Outputs: 
+            * output (tensor) - Tensor resulting from the convolution
+        """
         self.input = input.float()
         unfolded = unfold(input.float(), kernel_size=self.kernel_size, dilation=self.dilation, padding=self.padding, stride=self.stride)
         wxb = self.weight.view(self.out_chan, -1) @ unfolded + self.bias.view(1, -1, 1)
