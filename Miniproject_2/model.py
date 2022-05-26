@@ -140,11 +140,18 @@ class NearestUpSampling(Module) :
 
 class Sequential(Module) :
     def __init__(self, *modules):
+        """
+        Input:
+            * modules (Module): Ordered list of module forming the network.
+        """
         self.modules = modules
         self.input = Tensor()
 
 
     def forward (self, input) :
+        """
+        Perform the forward pass calling one after the other the forward methods of the ordered modules contained in the list.
+        """
         out = input
         for module in self.modules:
             out = module.forward(out)
@@ -153,19 +160,26 @@ class Sequential(Module) :
     
 
     def backward (self, gradwrtoutput):
+        """
+        Perform the backward pass calling in the reversed order the backward methods of the ordered modules contained in the list.
+        """
         for module in reversed(self.modules):
             gradwrtoutput = module.backward(gradwrtoutput)
         return gradwrtoutput
     
 
     def param (self) :
-        'should return multiple params'
+        """
+        Return parameters of the different layers of the network
+        """
         param = [m.param() for m in self.modules]
         return param
     
 
     def zero_grad(self) :
-        'set all the gradient of the weight and the bias to zero'
+        """
+        Set all the gradient of the weight and the bias to zero
+        """
         for m in self.modules:
             if isinstance(m, Conv2d):
                 m.zero_grad()
@@ -184,10 +198,13 @@ class Model(Module):
                 NearestUpSampling(2), 
                 Conv2d(in_channels=32, out_channels=3, kernel_size=3, stride=1, padding=1),
                 Sigmoid())
+
         #define the batch size
         self.mini_batch_size = 100
+
         #define the loss criterion
         self.criterion = MSE()
+
         #define the optimizer
         self.lr = 0.001
         self.momentum = 0.9
@@ -247,9 +264,19 @@ class Model(Module):
             self.save_model("Miniproject_2/bestmodel.pth")           
 
     def predict(self, test_input):
+        """
+        Predict the output of the model with test_input.
+        Input:
+            * test_input (tensor) - Tensor containing a set of corrupted images (not normalized) to use for training the denoiser
+        Output:
+            * Tensor containing not normalized denoised images predicted by the trained model.
+        """
         return self.model.forward(test_input) * 255
 
     def load_pretrained_model(self):
+        """
+        Load the pretrained model saved as "bestmodel.pth" in model.
+        """
         model_path = Path(__file__).parent / "bestmodel.pth"
         with open(model_path, "rb") as f:
             loaded_dict = pickle.load(f)
@@ -264,9 +291,15 @@ class Model(Module):
         
 
     def save_model(self, FILE) :
-        #store each of the modules’ states in a pickle file
-        #make the dictionnary
+        """
+        Store each of the modules’ states in a pickle file
+
+        Input:
+            * FILE (string): Name of the file to save
+        """
         print("save the model as " + FILE)
+        
+        #create the dictionnary
         model_dict = {}
         if isinstance(FILE, str):
             model_dict = {}
@@ -295,11 +328,20 @@ class Model(Module):
 
 class SGD(object) :
     def __init__(self, module, lr=0.01, momentum=0.9):
+        """
+        Inputs:
+            * module (Module): Sequential model
+            * lr (double): learning rate [0, 1]
+            * momentum (double): [0,1]
+        """
         self.module = module
         self.lr = lr
         self.momentum = momentum
 
     def step (self):
+        """
+        Update parameters of the network after one epoch
+        """
         param = self.module.param()       
         for p, m in zip(param, self.module.modules):
             if isinstance(m, Conv2d):
@@ -309,7 +351,7 @@ class SGD(object) :
     
 
     def zero_grad(self) :
-        'set all the gradient of the weight and the bias to zero'
+        """set all the gradient of the weight and the bias to zero"""
         self.module.zero_grad()
 
 
@@ -324,7 +366,7 @@ class MSE(Module) :
         return MSE_func(input, target)
 
     def backward (self):
-        return dMSE(self.tensor, self.target)/ self.tensor.shape[0]
+        return dMSE(self.tensor, self.target)/ (self.tensor.shape[0]*self.tensor.shape[1]*self.tensor.shape[2]*self.tensor.shape[3])
 
     def param (self) :
         return []
@@ -360,31 +402,3 @@ class Sigmoid(Module):
         return []
         
 
-#==============================================================================
-
-import torch
-from torch.nn import functional
-random.seed(0)
-torch.manual_seed(0)
-
-'''
-noisy_imgs_1 , noisy_imgs_2 = torch.load('data/train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1[:10].float()
-noisy_imgs_2 = noisy_imgs_2[:10].float()
-noisy_imgs, clean_imgs = torch.load('data/val_data.pkl')
-noisy_imgs = noisy_imgs[:10].float()
-clean_imgs = clean_imgs[:10].float()
-
-model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 4, save_model=True)
-prediction = model.predict(noisy_imgs)
-prediction = prediction.float() / 255.0
-clean_imgs = clean_imgs.float() / 255.0
-nb_test_errors = model.psnr(prediction, clean_imgs)
-print('test error Net', nb_test_errors)
-
-newmodel = Model()
-newmodel = newmodel.load_pretrained_model()
-print(newmodel.modules)
-
-'''
