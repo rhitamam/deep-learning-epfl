@@ -9,7 +9,10 @@ from pathlib import Path
 random.seed(0)
 manual_seed(0)
 
-class Module(object) :
+class Module(object):
+    '''
+    Abstract superclass that all modules must inherit in order to be sure that the forward and backward pass are implemented.
+    '''
     def forward (self,  input) :
         raise NotImplementedError
     def backward (self,  gradwrtoutput):
@@ -19,7 +22,22 @@ class Module(object) :
 
 
 class Conv2d(Module):
+    '''
+    Module to implement a 2D convolution over an input signal composed of several input planes.
+    '''
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True):
+        '''
+        Constructor that instantiates all the parameters used in the convolution. 
+        Initializes weights and bias such as the Conv2d counterpart.
+        Inputs: 
+            * in_channels (int) - Number of channels in the input image
+            * out_channels (int) - Number of channels produced by the convolution
+            * kernel_size (int or tuple) - Size of the convolving kernel
+            * stride (int or tuple, optional) - Stride of the convolution. Default: 1
+            * padding (int, tuple or str, optional) - Padding added to all four sides of the input. Default: 0
+            * dilation (int or tuple, optional) - Spacing between kernel elements. Default: 1
+            * bias (bool, optional) - If True, adds a learnable bias to the output. Default: True
+        '''
         self.in_chan = in_channels
         self.out_chan = out_channels
         self.kernel_size = int_to_tuple(kernel_size)
@@ -36,9 +54,8 @@ class Conv2d(Module):
     def forward (self,  input) :
         """
         Return a convoluted tensor.
-
         Inputs:
-            * input (tensor) - Tensor containing the input tensor to convolute with a tensor of weights.
+            * input (tensor) - Tensor containing the input tensor to convolute with a tensor of weights
         Outputs: 
             * output (tensor) - Tensor resulting from the convolution
         """
@@ -54,8 +71,8 @@ class Conv2d(Module):
     def backward(self, gradwrtoutput):
         """
         Return gradient of the loss w.r.t. to the output of the previous layer.
-        Compute the gradient of the loss w.r.t. the weights 
-        Compute the gradient of the loss w.r.t. the weights the bias (if Conv2d was initialized with bias=True)
+        Compute the gradient of the loss w.r.t. the weights.
+        Compute the gradient of the loss w.r.t. the weights the bias (if Conv2d was initialized with bias=True).
         Inputs:
             * gradwrtoutput (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the layer
         Outputs: 
@@ -93,7 +110,7 @@ class Conv2d(Module):
 
     def param(self):
         """
-        Return a list of pairs composed of a parameter tensor and a gradient tensor of the same size
+        Return a list of pairs composed of a parameter tensor and a gradient tensor of the same size.
         Output: 
             * list of pairs composed of a parameter tensor and a gradient tensor
         """
@@ -105,7 +122,7 @@ class Conv2d(Module):
 
     def zero_grad(self):
         """
-        Set all the gradient of the weight and the bias to zero
+        Set all the gradient of the weight and the bias to zero.
         """
         self.w_grad = empty(self.weight.shape).normal_()
         if self.bias_bool:
@@ -113,23 +130,48 @@ class Conv2d(Module):
 
 
     def set_weight_and_bias(self, weight, bias):
+        """
+        Weight and bias setter function.
+        """
         self.weight = weight
         if self.bias_bool:
             self.bias = bias
         
 
 class NearestUpSampling(Module) :
+    '''
+    Upsamples a given multi-channel data.
+    '''
     def __init__(self,scalefactor):
+        '''
+        Instantiates the NearestUpSampling layer with its scale factor.
+        Inputs:
+            * scale_factor (float or Tuple[float, float], optional) - multiplier for spatial size.
+        '''
         self.scalefactor = scalefactor
     
 
     def forward(self, input):
+        '''
+        Applies a 2D nearest neighbor upsampling to an input signal composed of several input channels.
+        Inputs:
+            * input (tensor) - Tensor containing the input tensor to upsample with a tensor of weights
+        Outputs: 
+            * output (tensor) - Tensor resulting from the upsampling
+        '''
         first = repeat_interleave(input, 2, dim=3)
         final =  repeat_interleave(first,2,dim=2)
         return final
 
 
     def backward(self, gradwrtoutput):
+        '''
+        Return gradient of the loss w.r.t. to the output of the previous layer.
+        Inputs:
+            * gradwrtoutput (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the layer
+        Outputs: 
+            * final (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the previous layer
+        '''
         if isinstance(gradwrtoutput,tuple):
             weight, bias = gradwrtoutput
         else:
@@ -148,10 +190,14 @@ class NearestUpSampling(Module) :
         return final
 
 
-class Sequential(Module) :
+class Sequential(Module):
+    '''
+    A sequential container of different modules.
+    '''
     def __init__(self, *modules):
         """
-        Input:
+        Constructor of the Sequential class, that is the concatenation of different modules.
+        Inputs:
             * modules (Module): Ordered list of module forming the network.
         """
         self.modules = modules
@@ -161,6 +207,10 @@ class Sequential(Module) :
     def forward (self, input) :
         """
         Perform the forward pass calling one after the other the forward methods of the ordered modules contained in the list.
+        Inputs:
+            * input (tensor) - Tensor containing the input tensor 
+        Outputs: 
+            * output (tensor) - Tensor resulting from the sequential 
         """
         out = input
         for module in self.modules:
@@ -172,12 +222,15 @@ class Sequential(Module) :
     def backward (self, gradwrtoutput):
         """
         Perform the backward pass calling in the reversed order the backward methods of the ordered modules contained in the list.
+        Inputs:
+            * gradwrtoutput (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the last layer
+        Outputs: 
+            * final (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the first layer
         """
         for module in reversed(self.modules):
             gradwrtoutput = module.backward(gradwrtoutput)
         return gradwrtoutput
     
-
     def param (self) :
         """
         Return parameters of the different layers of the network
@@ -197,6 +250,9 @@ class Sequential(Module) :
 
 class Model(Module):
     def __init__(self) :
+        """
+        Class constructor, instantiates model, optimizer, loss function, batch-norm, criterion and device.
+        """
         #define the model
         self.model = Sequential(Conv2d(in_channels=3, out_channels=48, kernel_size=3, stride=2, padding=1), 
                 ReLU(),
@@ -222,10 +278,20 @@ class Model(Module):
 
 
     def set_lr(self, lr):
+        '''
+        SGD learning rate setter.
+        Inputs:
+            * lr (int) - learning rate
+        '''
         self.lr = lr
 
 
     def set_momentum(self, momentum):
+        '''
+        SGD momentum setter.
+        Inputs:
+            * momentum (int) - momentum
+        '''
         self.momentum = momentum
         
         
@@ -329,6 +395,14 @@ class Model(Module):
             
     
     def psnr(self, denoised , ground_truth):
+        """
+        Computes the peak signal-to-noise ratio (PSNR) used to compare image compression quality.
+        Inputs:
+            * denoised (tensor) - denoised image
+            * ground_truth (tensor) - target clean image
+        Outputs: 
+            * (int) - the PSNR error between the input and the target
+        """
         # Peak Signal to Noise Ratio: denoised and ground_truth have range [0, 1] 
         denoised = denoised.float()
         ground_truth = ground_truth.float()
@@ -339,6 +413,7 @@ class Model(Module):
 class SGD(object) :
     def __init__(self, module, lr=0.01, momentum=0.9):
         """
+        Implements stochastic gradient descent (optionally with momentum).
         Inputs:
             * module (Module): Sequential model
             * lr (double): learning rate [0, 1]
@@ -368,31 +443,64 @@ class SGD(object) :
 
 
 class MSE(Module) :
+    '''
+    Creates a criterion that measures the mean squared error (squared L2 norm) between each element in the input x and target y.
+    '''
     def __init__(self):
         self.tensor = Tensor()
         self.target = Tensor()
 
     def forward (self, input, target):
+        '''
+        Computes MS error.
+        Inputs:
+            * input (tensor) - input to compare
+            * target (tensor) - ground truth
+        Outputs:
+            * (int) - MSE error
+        '''
         self.tensor = input
         self.target = target
         return MSE_func(input, target)
 
     def backward (self):
+        '''
+        Compute local gradient of MSE with respect to the input and target.
+        Outputs:
+            * () - derivative of MSE error
+        '''
         return dMSE(self.tensor, self.target)/ (self.tensor.shape[0]*self.tensor.shape[1]*self.tensor.shape[2]*self.tensor.shape[3])
 
     def param (self) :
         return []
 
 
-class ReLU(Module) :
+class ReLU(Module):
+    '''
+    Applies the rectified linear unit function element-wise.
+    '''
     def __init__(self):
         self.tensor = Tensor()
 
     def forward (self,  input):
+        '''
+        Computes ReLU(x).
+        Inputs:
+            * input (tensor) - input tensor
+        Outputs:
+            * (tensor) - output tensor
+        '''
         self.tensor = input
         return ReLU_func(input)
 
     def backward (self, gradwrtoutput):
+        '''
+        Compute gradient of ReLU(x).
+        Inputs:
+            * input (tensor) - input tensor
+        Outputs:
+            * (tensor) - output tensor
+        '''
         return gradwrtoutput * dReLU(self.tensor)
 
     def param (self) :
@@ -404,10 +512,24 @@ class Sigmoid(Module):
         self.tensor = Tensor()
 
     def forward (self,  input):
+        '''
+        Compute Sigmoid(x).
+        Inputs:
+            * input (tensor) - input tensor
+        Outputs:
+            * (tensor) - output tensor
+        '''
         self.tensor = input
         return Sigmoid_func(input)
 
     def backward (self, gradwrtoutput):
+        '''
+        Compute gradient of ReLU(x).
+        Inputs:
+            * input (tensor) - input tensor
+        Outputs:
+            * (tensor) - output tensor
+        '''
         return gradwrtoutput * dSigmoid(self.tensor)
 
     def param (self) :
