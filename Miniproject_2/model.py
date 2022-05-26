@@ -173,7 +173,7 @@ class Model(Module):
         self.mini_batch_size = 100
         self.criterion = MSE()
         #define the optimizer
-        self.lr = 0.01
+        self.lr = 0.001
         self.momentum = 0.9
         self.optimizer = SGD(self.model, lr=self.lr, momentum=self.momentum)
 
