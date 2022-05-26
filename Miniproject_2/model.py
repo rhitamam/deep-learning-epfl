@@ -44,13 +44,27 @@ class Conv2d(Module):
         return output
 
     def backward(self, gradwrtoutput):
+        """
+        Return gradient of the loss w.r.t. to the output of the previous layer.
+        Compute the gradient of the loss w.r.t. the weights 
+        Compute the gradient of the loss w.r.t. the weights the bias (if Conv2d was initialized with bias=True)
+        Inputs:
+            * gradwrtoutput (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the layer
+        Outputs: 
+            * dl_dx_old (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the previous layer
+        """
+        #initialize an empty list that will contain the gradient of the loss w.r.t. to the previous output
         dl_dx_old = []
+
         for dl_ds in gradwrtoutput:
-            
+            #compute the derivative of the loss w.r.t. one previous output
             dl_dx_old_j = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
+            #reshape to match the size of the previous output
             dl_dx_old_j = fold(dl_dx_old_j, output_size=self.input.shape[2:], kernel_size=self.kernel_size, dilation= self.dilation, padding= self.padding,stride=self.stride)
+            #add the new derivative to the gradient
             dl_dx_old.append(dl_dx_old_j)
             
+            #compute the gradient of the loss w.r.t. to the weights
             for x_old in self.input:
                 unfolded = unfold(x_old.unsqueeze(0), 
                                     kernel_size=self.kernel_size, 
@@ -60,9 +74,11 @@ class Conv2d(Module):
                 
                 self.w_grad.add_((dl_ds.reshape(self.out_chan, unfolded.shape[2]) @ unfolded.squeeze(0).t()).view(self.w_grad.size()))
         
+        #if the Conv2d has a bias parameter we compute the gradient of the loss w.r.t. to the bias
         if self.bias_bool:
             self.b_grad = gradwrtoutput.sum((0,2,3))
-        
+
+        #Concatenate the list in order to retrun a tensor that could be packpropagate to other layers
         dl_dx_old = cat(dl_dx_old)
         return (dl_dx_old)
 
@@ -194,6 +210,7 @@ class Model(Module):
 
         for epoch in range(num_epochs) :
             acc_loss = 0
+
             for b in range(0, train_input.size(0), self.mini_batch_size):
                 
                 input = train_input[b: b + self.mini_batch_size]
