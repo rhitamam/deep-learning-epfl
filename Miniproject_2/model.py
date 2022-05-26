@@ -351,7 +351,9 @@ class SGD(object) :
     
 
     def zero_grad(self) :
-        """set all the gradient of the weight and the bias to zero"""
+        """
+        Set all the gradient of the weight and the bias to zero.
+        """
         self.module.zero_grad()
 
 
