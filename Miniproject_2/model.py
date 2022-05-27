@@ -262,7 +262,7 @@ class Model(Module):
                 Sigmoid())
 
         #define the batch size
-        self.mini_batch_size = 10
+        self.mini_batch_size = 100
 
         #define the loss criterion
         self.criterion = MSE()
@@ -343,7 +343,9 @@ class Model(Module):
         Output:
             * Tensor containing not normalized denoised images predicted by the trained model.
         """
-        return self.model.forward(test_input/255) * 255
+        #normalize the data
+        test_input = test_input.float() /255
+        return self.model.forward(test_input) * 255
 
     def load_pretrained_model(self):
         """
@@ -407,7 +409,7 @@ class Model(Module):
        
 
 class SGD(object) :
-    def __init__(self, module, lr=0.01, momentum=0.9):
+    def __init__(self, module, lr=0.001, momentum=0.9):
         """
         Implements stochastic gradient descent (optionally with momentum).
         Inputs:
