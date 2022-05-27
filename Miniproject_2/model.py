@@ -78,34 +78,30 @@ class Conv2d(Module):
         Outputs: 
             * dl_dx_old (tensor) - Tensor containing the gradient of the loss w.r.t. the output of the previous layer
         """
-        #initialize an empty list that will contain the gradient of the loss w.r.t. to the previous output
         dl_dx_old = []
-
-        for dl_ds in gradwrtoutput:
-            #compute the derivative of the loss w.r.t. one previous output
-            dl_dx_old_j = self.weight.view(self.out_chan, -1).t() @ dl_ds.view(1, self.out_chan, -1) 
-            #reshape to match the size of the previous output
-            dl_dx_old_j = fold(dl_dx_old_j, output_size=self.input.shape[2:], kernel_size=self.kernel_size, dilation= self.dilation, padding= self.padding,stride=self.stride)
-            #add the new derivative to the gradient
-            dl_dx_old.append(dl_dx_old_j)
-            
-            #compute the gradient of the loss w.r.t. to the weights
-            for x_old in self.input:
-                unfolded = unfold(x_old.unsqueeze(0), 
-                                    kernel_size=self.kernel_size, 
-                                    dilation=self.dilation, 
-                                    padding=self.padding, 
-                                    stride=self.stride)
-                
-                self.w_grad.add_((dl_ds.reshape(self.out_chan, unfolded.shape[2]) @ unfolded.squeeze(0).t()).view(self.w_grad.size()))
+        a,b,c,d = self.input.shape
         
-        #if the Conv2d has a bias parameter we compute the gradient of the loss w.r.t. to the bias
+        unfolded = unfold(self.input, 
+                            kernel_size=self.kernel_size, 
+                            dilation=self.dilation, 
+                            padding=self.padding, 
+                            stride=self.stride)
+        self.w_grad = ((gradwrtoutput.view(a,self.out_chan, -1) 
+                        @ unfolded.transpose(1,2)).sum(0)).view(self.out_chan, self.in_chan, self.kernel_size[0], self.kernel_size[1])
+
         if self.bias_bool:
             self.b_grad = gradwrtoutput.sum((0,2,3))
 
-        #Concatenate the list in order to retrun a tensor that could be packpropagate to other layers
-        dl_dx_old = cat(dl_dx_old)
-        return (dl_dx_old)
+        intermediate = gradwrtoutput.view(a, self.out_chan, -1).transpose(1,2) @ self.weight.view(self.out_chan, -1)
+
+        dl_dx_old = fold(intermediate.transpose(1,2), 
+                            (c,d),
+                            kernel_size=self.kernel_size[0], 
+                            dilation=self.dilation, 
+                            padding=self.padding, 
+                            stride=self.stride)
+
+        return dl_dx_old 
 
 
     def param(self):
@@ -182,7 +178,7 @@ class NearestUpSampling(Module) :
                         self.scalefactor*self.scalefactor,
                         int((weight.size()[2]/self.scalefactor)*(weight.size()[2]/self.scalefactor)))
         to_mean = viewed.transpose(1,1).transpose(2,3)
-        meaned = to_mean.mean(axis=3)
+        meaned = to_mean.sum(axis=3)
         final = meaned.view(weight.size()[0],
                             weight.size()[1],
                             int(weight.size()[2]/2),
@@ -266,7 +262,7 @@ class Model(Module):
                 Sigmoid())
 
         #define the batch size
-        self.mini_batch_size = 100
+        self.mini_batch_size = 10
 
         #define the loss criterion
         self.criterion = MSE()
@@ -347,7 +343,7 @@ class Model(Module):
         Output:
             * Tensor containing not normalized denoised images predicted by the trained model.
         """
-        return self.model.forward(test_input) * 255
+        return self.model.forward(test_input/255) * 255
 
     def load_pretrained_model(self):
         """
@@ -534,5 +530,3 @@ class Sigmoid(Module):
 
     def param (self) :
         return []
-        
-
