@@ -1,10 +1,5 @@
-### For mini - project 1
-from ast import Mod
 import torch 
 import torch.nn as nn
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
 from pathlib import Path
 torch.manual_seed(0)
 
@@ -261,26 +256,8 @@ class Model(nn.Module) :
         Outputs:
             * (tensor of size (N1, C, H, W)) denoised version of the input
         """
-        return self.model(test_input.float())        
+        test_input = test_input.float()/255
+        out = self.model(test_input.float())
+        out = (out - out.min())/(out.max() - out.min())
+        return out * 255.0  
 
-#####################################################################
-
-'''
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-noisy_imgs_1 , noisy_imgs_2 = torch.load('../data/train_data.pkl')
-noisy_imgs_1 = noisy_imgs_1.to(device)
-noisy_imgs_2 = noisy_imgs_2.to(device)
-noisy_imgs, clean_imgs = torch.load('../data/val_data.pkl')
-noisy_imgs = noisy_imgs.to(device)
-clean_imgs = clean_imgs.to(device)
-
-model = Model()
-model.train(noisy_imgs_1, noisy_imgs_2, 100, save_model=True)
-prediction = model.predict(noisy_imgs)
-nb_test_errors = psnr(prediction, clean_imgs)
-print('test error Net', nb_test_errors)
-'''
-
-''' loaded = Model()
-loaded.load_state_dict(torch.load(FILE))
-loaded.eval()'''
