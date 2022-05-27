@@ -358,7 +358,7 @@ class Model(Module):
 
     def save_model(self, FILE) :
         """
-        Store each of the modules’ states in a pickle file
+        Store each of the modules’ states in a pickle file.
 
         Input:
             * FILE (string): Name of the file to save
@@ -413,7 +413,7 @@ class SGD(object) :
 
     def step (self):
         """
-        Update parameters of the network after one epoch
+        Update parameters of the network after one epoch.
         """
         param = self.module.param()       
         for p, m in zip(param, self.module.modules):
