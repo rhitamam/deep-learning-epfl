@@ -268,7 +268,7 @@ class Model(Module):
         self.criterion = MSE()
 
         #define the optimizer
-        self.lr = 0.001
+        self.lr = 0.01
         self.momentum = 0.9
         self.optimizer = SGD(self.model, lr=self.lr, momentum=self.momentum)
 
@@ -344,7 +344,7 @@ class Model(Module):
             * Tensor containing not normalized denoised images predicted by the trained model.
         """
         #normalize the data
-        test_input = test_input.float() /255
+        test_input = test_input.float() / 255.0
         return self.model.forward(test_input) * 255
 
     def load_pretrained_model(self):
