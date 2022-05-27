@@ -268,9 +268,8 @@ class Model(Module):
         self.criterion = MSE()
 
         #define the optimizer
-        self.lr = 0.01
-        self.momentum = 0.9
-        self.optimizer = SGD(self.model, lr=self.lr, momentum=self.momentum)
+        self.lr = 0.2
+        self.optimizer = SGD(self.model, lr=self.lr)
 
 
     def set_lr(self, lr):
@@ -281,14 +280,6 @@ class Model(Module):
         '''
         self.lr = lr
 
-
-    def set_momentum(self, momentum):
-        '''
-        SGD momentum setter.
-        Inputs:
-            * momentum (int) - momentum
-        '''
-        self.momentum = momentum
         
         
     def train(self, train_input, train_target, num_epochs, save_model = False) :
@@ -304,6 +295,7 @@ class Model(Module):
         train_input = train_input.float() / 255
         train_target= train_target.float() / 255
 
+        print('lr', self.lr)
         for epoch in range(num_epochs) :
             acc_loss = 0
 
@@ -409,17 +401,15 @@ class Model(Module):
        
 
 class SGD(object) :
-    def __init__(self, module, lr=0.001, momentum=0.9):
+    def __init__(self, module, lr=0.1):
         """
-        Implements stochastic gradient descent (optionally with momentum).
+        Implements stochastic gradient descent.
         Inputs:
             * module (Module): Sequential model
             * lr (double): learning rate [0, 1]
-            * momentum (double): [0,1]
         """
         self.module = module
         self.lr = lr
-        self.momentum = momentum
 
     def step (self):
         """
