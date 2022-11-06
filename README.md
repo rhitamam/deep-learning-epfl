@@ -1,1 +1,1 @@
-# deep-learning-epfl
+# deep-learning-project-epfl
